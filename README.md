@@ -117,34 +117,26 @@ For a detailed explanation of the system's architecture, components, and design,
 
 ## Tests
 
-`moves` includes a comprehensive test suite with 385 tests across all components. The test system uses `pytest`.
+`moves` includes a focused test suite with 48 critical tests. The test system uses `pytest` and emphasizes integration testing over exhaustive unit testing.
 
 ### Running Tests
 
 ```bash
-# Run all tests
 uv run pytest
-
-# Run with verbose output
-uv run pytest -v
-
-# Run with coverage report
-uv run pytest --cov=src --cov-report=html
 ```
 
 ### Test Coverage
 
 The test suite covers:
 
-- **CLI Application** (47 tests) - All command-line operations including speaker management, settings, and presentation control
-- **Core Components** (102 tests) - Speaker manager, settings editor, and presentation controller
-- **Processing Components** (106 tests) - Chunk generation, section production, and similarity calculation
-- **Similarity Units** (69 tests) - Phonetic and semantic similarity algorithms with caching
-- **Utilities** (44 tests) - Data handling, ID generation, and text normalization
+- **CLI Integration** (10 tests) - Essential command-line operations and error handling
+- **Core Modules** (17 tests) - Settings editor, speaker manager, and presentation controller
+- **Components** (13 tests) - Chunk generation, section extraction, and similarity calculation
+- **Utilities** (11 tests) - Data handling, ID generation, and text normalization
 
-**Current Status:** 385/385 tests should pass
+**Current Status:** 48/48 tests passing
 
-For detailed information about the test system, coverage analysis, and testing patterns, see the [Test System Documentation](./docs/about/tests.md).
+For detailed information about the test structure and refactoring, see the [Test System Documentation](./docs/about/tests.md).
 
 ## Contributing
 

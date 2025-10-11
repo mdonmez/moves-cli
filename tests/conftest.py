@@ -1,14 +1,15 @@
-"""Pytest configuration and global fixtures."""
+"""Pytest configuration and shared fixtures."""
 
 import sys
 from unittest.mock import MagicMock
 
-# Mock sounddevice at import time to avoid PortAudio dependency issues
-# This ensures tests can run even if PortAudio is not installed
+# Mock system dependencies to avoid hardware/display requirements
+# This ensures tests can run in CI/CD environments without audio devices or X servers
+
+# Mock sounddevice (requires PortAudio)
 sys.modules["sounddevice"] = MagicMock()
 
-# Mock pynput at import time to avoid X server/display dependency issues
-# This ensures tests can run in headless environments like GitHub Actions
+# Mock pynput (requires display server)
 pynput_mock = MagicMock()
 pynput_mock.keyboard = MagicMock()
 sys.modules["pynput"] = pynput_mock

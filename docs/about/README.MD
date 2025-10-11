@@ -18,4 +18,4 @@ This section provides a granular, in-depth exploration of the internal architect
 
 - **[Utilities](utilities.md):** Provides an overview of the essential helper modules responsible for sandboxed file handling, canonical text normalization, unique ID generation, and component-isolated logging.
 
-- **[Test System](tests.md):** Documents the comprehensive test suite with 385 tests covering CLI commands, core components, processing logic, and utilities, including testing patterns, coverage analysis, and CI/CD integration guidelines.
+- **[Test System](tests.md):** The documentation describes a test package consisting of 48 tests covering critical CLI workflows, core business logic, data processing components, and auxiliary functions.

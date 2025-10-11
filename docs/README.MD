@@ -16,4 +16,4 @@ If you want to understand moves’ structure, the [Architecture](architecture.md
 
 ## Technical Details
 
-If you want a deeper look into moves, the [About](about/README.MD) documents covers its internal architecture, execution flow, operation logic and design decisions behind mechanisms.
+If you want a deeper look into moves, the [About](about/README.MD) documents covers its internal architecture, execution flow, operation logic, tests and design decisions behind mechanisms.
