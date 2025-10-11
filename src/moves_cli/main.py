@@ -14,13 +14,12 @@ def speaker_manager_instance():
 def presentation_controller_instance(sections: list[Section], start_section: Section):
     from moves_cli.core.presentation_controller import PresentationController
 
-    typer.echo("Loading speech recognition models (this may take 20-30 seconds)...")
+    typer.echo("Loading speech recognition models (this may take a while)...")
     controller = PresentationController(
         sections=sections,
         start_section=start_section,
         window_size=12,
     )
-    typer.echo("Models loaded successfully!")
     return controller
 
 

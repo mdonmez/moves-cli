@@ -3,7 +3,14 @@
 import pytest
 import re
 from pathlib import Path
-from moves_cli.utils import data_handler, id_generator, text_normalizer
+from unittest.mock import MagicMock, patch
+import httpx
+from moves_cli.utils import (
+    data_handler,
+    id_generator,
+    text_normalizer,
+    model_downloader,
+)
 
 
 @pytest.fixture
@@ -93,3 +100,129 @@ class TestTextNormalizer:
         """Test accent removal."""
         result = text_normalizer.normalize_text("café")
         assert result == "cafe"
+
+
+class TestModelDownloader:
+    """Critical tests for model downloading functionality."""
+
+    def test_models_config_structure(self):
+        """Test that MODELS dictionary has correct structure."""
+        assert "embedding" in model_downloader.MODELS
+        assert "stt" in model_downloader.MODELS
+
+        for model_type, config in model_downloader.MODELS.items():
+            assert "name" in config
+            assert "base_url" in config
+            assert "files" in config
+            assert isinstance(config["files"], list)
+            assert len(config["files"]) > 0
+
+    def test_download_file_creates_file(self, tmp_path, monkeypatch):
+        """Test that _download_file creates a file with correct content."""
+        test_file = tmp_path / "test_model.txt"
+        test_content = b"test model content"
+
+        # Mock httpx.Client and response
+        mock_response = MagicMock()
+        mock_response.headers.get.return_value = str(len(test_content))
+        mock_response.iter_bytes.return_value = [test_content]
+        mock_response.__enter__ = lambda self: self
+        mock_response.__exit__ = lambda self, *args: None
+
+        mock_client = MagicMock()
+        mock_client.stream.return_value = mock_response
+
+        model_downloader._download_file(mock_client, "http://test.url", test_file)
+
+        assert test_file.exists()
+        assert test_file.read_bytes() == test_content
+
+    def test_download_file_skips_existing(self, tmp_path):
+        """Test that _download_file skips already downloaded files."""
+        test_file = tmp_path / "existing.txt"
+        test_file.write_bytes(b"existing content")
+
+        mock_client = MagicMock()
+
+        model_downloader._download_file(mock_client, "http://test.url", test_file)
+
+        # Should not make any HTTP request
+        mock_client.stream.assert_not_called()
+        assert test_file.read_bytes() == b"existing content"
+
+    def test_download_file_handles_http_error(self, tmp_path):
+        """Test that _download_file handles HTTP errors properly."""
+        test_file = tmp_path / "failed.txt"
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "404", request=MagicMock(), response=MagicMock()
+        )
+        mock_response.__enter__ = lambda self: self
+        mock_response.__exit__ = lambda self, *args: None
+
+        mock_client = MagicMock()
+        mock_client.stream.return_value = mock_response
+
+        with pytest.raises(RuntimeError, match="Download failed"):
+            model_downloader._download_file(mock_client, "http://test.url", test_file)
+
+        # File should be cleaned up on failure
+        assert not test_file.exists()
+
+    def test_download_model_invalid_type(self):
+        """Test that download_model raises error for invalid model type."""
+        with pytest.raises(ValueError, match="Unsupported model type"):
+            model_downloader.download_model("invalid_type")  # type: ignore[arg-type]
+
+    def test_download_model_creates_directory(self, tmp_path, monkeypatch):
+        """Test that download_model creates the model directory."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        # Mock the HTTP client and download
+        with patch(
+            "moves_cli.utils.model_downloader.httpx.Client"
+        ) as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.__enter__ = lambda self: self
+            mock_client.__exit__ = lambda self, *args: None
+            mock_client_class.return_value = mock_client
+
+            # Mock successful download
+            mock_response = MagicMock()
+            mock_response.headers.get.return_value = "100"
+            mock_response.iter_bytes.return_value = [b"test"]
+            mock_response.__enter__ = lambda self: self
+            mock_response.__exit__ = lambda self, *args: None
+            mock_client.stream.return_value = mock_response
+
+            result = model_downloader.download_model("embedding")
+
+            expected_dir = tmp_path / "ml_models" / "all-MiniLM-L6-v2_quint8_avx2"
+            assert result == expected_dir
+            assert expected_dir.exists()
+
+    def test_download_model_downloads_all_files(self, tmp_path, monkeypatch):
+        """Test that download_model attempts to download all required files."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        with patch(
+            "moves_cli.utils.model_downloader.httpx.Client"
+        ) as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.__enter__ = lambda self: self
+            mock_client.__exit__ = lambda self, *args: None
+            mock_client_class.return_value = mock_client
+
+            mock_response = MagicMock()
+            mock_response.headers.get.return_value = "100"
+            mock_response.iter_bytes.return_value = [b"test"]
+            mock_response.__enter__ = lambda self: self
+            mock_response.__exit__ = lambda self, *args: None
+            mock_client.stream.return_value = mock_response
+
+            model_downloader.download_model("stt")
+
+            # Should have called stream for each file in the STT model
+            expected_files = model_downloader.MODELS["stt"]["files"]
+            assert mock_client.stream.call_count == len(expected_files)

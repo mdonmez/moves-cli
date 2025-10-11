@@ -1,17 +1,18 @@
-from importlib.resources import files
 import numpy as np
+from pathlib import Path
 
+from moves_cli.utils import data_handler
 from moves_cli.data.models import SimilarityResult, Chunk
 
 
 class Semantic:
     def __init__(self) -> None:
         self._model = None
-        # Get absolute path to the model directory relative to this package
-        self._model_path = str(
-            files("moves_cli.core.components").joinpath(
-                "ml_models", "all-MiniLM-L6-v2_quint8_avx2"
-            )
+
+        self._model_path = (
+            Path(data_handler.DATA_FOLDER)
+            / "ml_models"
+            / "all-MiniLM-L6-v2_quint8_avx2"
         )
 
     @property

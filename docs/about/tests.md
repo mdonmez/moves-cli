@@ -2,7 +2,7 @@
 
 ## Overview
 
-The test suite evaluates the system's critical areas and overall functionality across **51 tests** organized into 4 main test files.
+The test suite evaluates the system's critical areas and overall functionality across **55 tests** organized into 4 main test files.
 
 ---
 
@@ -30,9 +30,9 @@ uv run pytest tests/test_cli.py
 tests/
 ├── conftest.py          # Shared fixtures and mocks
 ├── test_cli.py          # CLI tests (10)
-├── test_core.py         # Core logic tests (17)
+├── test_core.py         # Core logic tests (15)
 ├── test_components.py   # Component tests (13)
-└── test_utils.py        # Utility tests (11)
+└── test_utils.py        # Utility tests (17)
 ```
 
 ---
@@ -52,7 +52,7 @@ Tests command-line interface workflows:
 
 ---
 
-### 2. Core Modules (17 tests)
+### 2. Core Modules (15 tests)
 
 Tests business logic and management systems:
 
@@ -70,7 +70,7 @@ Tests business logic and management systems:
 - JSON persistence
 - Unicode/special character support
 
-#### Presentation Controller (6 tests)
+#### Presentation Controller (4 tests)
 
 - Controller initialization
 - Custom window sizing
@@ -104,15 +104,16 @@ Tests data processing pipeline:
 
 ---
 
-### 4. Utilities (11 tests)
+### 4. Utilities (17 tests)
 
 Tests helper functions:
 
-| Module              | Tests | Key Features                                         |
-| ------------------- | ----- | ---------------------------------------------------- |
-| **Data Handler**    | 4     | File I/O, UTF-8 encoding, directory creation         |
-| **ID Generator**    | 3     | Format: `name-slug-xxxxx`, URL-safe, accent handling |
-| **Text Normalizer** | 4     | Lowercase, number-to-words, accent removal           |
+| Module               | Tests | Key Features                                         |
+| -------------------- | ----- | ---------------------------------------------------- |
+| **Data Handler**     | 4     | File I/O, UTF-8 encoding, directory creation         |
+| **ID Generator**     | 3     | Format: `name-slug-xxxxx`, URL-safe, accent handling |
+| **Text Normalizer**  | 4     | Lowercase, number-to-words, accent removal           |
+| **Model Downloader** | 6     | Config validation, file downloads, error handling    |
 
 ---
 

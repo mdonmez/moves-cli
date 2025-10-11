@@ -1,6 +1,6 @@
 # LLM to be used for section generation based on transcript and presentation
 # Available providers and models: https://models.litellm.ai/
-model = "gemini/gemini-2.0-flash"
+model = "gemini/gemini-2.5-flash-lite"
 
 # API key for the LLM provider.
 key = "None"

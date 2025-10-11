@@ -65,8 +65,8 @@ Configure `moves` with the desired Large Language Model (LLM) and provide an API
 > **Note:** A list of compatible models is available at [LiteLLM Supported Models](https://models.litellm.ai/).
 
 ```bash
-# Set the desired model (e.g., OpenAI's GPT-4o Mini)
-moves settings set model openai/gpt-4o-mini
+# Set the desired model (e.g., Gemini's Gemini-2.5-Flash-Lite)
+moves settings set model gemini/gemini-2.5-flash-lite
 
 # Set your API key
 moves settings set key YOUR_API_KEY_HERE
@@ -129,14 +129,14 @@ uv run pytest
 
 The test suite covers:
 
-- **CLI Integration** (10 tests) - Essential command-line operations and error handling
-- **Core Modules** (17 tests) - Settings editor, speaker manager, and presentation controller
-- **Components** (13 tests) - Chunk generation, section extraction, and similarity calculation
-- **Utilities** (11 tests) - Data handling, ID generation, and text normalization
+- **CLI Integration** - Essential command-line operations and error handling
+- **Core Modules** - Settings editor, speaker manager, and presentation controller
+- **Components** - Chunk generation, section extraction, and similarity calculation
+- **Utilities** - Data handling, ID generation, model downloading, and text normalization
 
-**Current Status:** 48/48 tests passing
+**Current Status:** 55/55 tests passing
 
-For detailed information about the test structure and refactoring, see the [Test System Documentation](./docs/about/tests.md).
+For detailed information about the test structure, see the [Test System Documentation](./docs/about/tests.md).
 
 ## Contributing
 

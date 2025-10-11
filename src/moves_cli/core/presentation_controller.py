@@ -1,7 +1,6 @@
 import threading
 import time
 from collections import deque
-from importlib.resources import files
 
 import sounddevice as sd
 from pynput.keyboard import Key, Controller, Listener
@@ -9,8 +8,11 @@ from sherpa_onnx import OnlineRecognizer
 
 from moves_cli.data.models import Section
 from moves_cli.utils import text_normalizer
+from moves_cli.utils import data_handler
+from moves_cli.utils import model_downloader
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
+from pathlib import Path
 
 
 class PresentationController:
@@ -24,6 +26,9 @@ class PresentationController:
         self.sample_rate = 16000
         self.window_size = window_size
 
+        model_downloader.download_model("embedding")
+        model_downloader.download_model("stt")
+
         self.similarity_calculator = SimilarityCalculator()
 
         self.sections = sections
@@ -33,8 +38,8 @@ class PresentationController:
         self.audio_queue = deque(maxlen=5)
         self.shutdown_flag = threading.Event()
 
-        model_dir = files("moves_cli.core.components").joinpath(
-            "ml_models", "nemo-streaming-stt-480ms-int8"
+        model_dir = Path(
+            data_handler.DATA_FOLDER / "ml_models" / "nemo-streaming-stt-480ms-int8"
         )
 
         self.recognizer = OnlineRecognizer.from_transducer(
