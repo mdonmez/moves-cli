@@ -1,19 +1,19 @@
 import tomlkit
 import copy
+from importlib.resources import files
 from typing import Dict, Any
 
 from moves_cli.data.models import Settings
 from moves_cli.utils import data_handler
-from pathlib import Path
 
 
 class SettingsEditor:
     # Get absolute path to the template file relative to the package
-    template = Path(__file__).parent.parent / "data" / "settings_template.toml"
+    template = files("moves_cli.data").joinpath("settings_template.toml")
     settings = data_handler.DATA_FOLDER / "settings.toml"
 
     def __init__(self):
-        self._template_doc = tomlkit.parse(self.template.read_text(encoding="utf-8"))
+        self._template_doc = tomlkit.parse(self.template.read_text())
         self._template_defaults: Dict[str, Any] = dict(self._template_doc)
 
         try:

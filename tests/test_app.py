@@ -991,7 +991,7 @@ class TestVersionCallback:
             result = runner.invoke(app, ["--version"])
 
             assert result.exit_code == 0
-            assert "moves version 1.0.0" in result.output
+            assert "moves-cli version 1.0.0" in result.output
 
     def test_version_flag_handles_error(self, runner):
         """Test that --version handles error gracefully"""
@@ -1002,4 +1002,3 @@ class TestVersionCallback:
 
             assert result.exit_code == 0
             assert "Error retrieving version" in result.output
-

@@ -1,4 +1,5 @@
 import instructor
+from importlib.resources import files
 from litellm import completion
 import pymupdf
 from pathlib import Path
@@ -51,7 +52,9 @@ def _call_llm(
         )
 
     try:
-        system_prompt = Path("data/llm_instruction.md").read_text(encoding="utf-8")
+        system_prompt = (
+            files("moves_cli.data").joinpath("llm_instruction.md").read_text()
+        )
         client = instructor.from_litellm(completion, mode=instructor.Mode.JSON)
 
         response = client.chat.completions.create(

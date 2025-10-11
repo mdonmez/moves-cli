@@ -1,7 +1,7 @@
 import threading
 import time
 from collections import deque
-from pathlib import Path
+from importlib.resources import files
 
 import sounddevice as sd
 from pynput.keyboard import Key, Controller, Listener
@@ -33,13 +33,15 @@ class PresentationController:
         self.audio_queue = deque(maxlen=5)
         self.shutdown_flag = threading.Event()
 
-        model_path = Path("models/nemo-streaming-stt-480ms-int8")
+        model_dir = files("moves_cli.core.components").joinpath(
+            "ml_models", "nemo-streaming-stt-480ms-int8"
+        )
 
         self.recognizer = OnlineRecognizer.from_transducer(
-            tokens=str(model_path / "tokens.txt"),
-            encoder=str(model_path / "encoder.int8.onnx"),
-            decoder=str(model_path / "decoder.int8.onnx"),
-            joiner=str(model_path / "joiner.int8.onnx"),
+            tokens=str(model_dir.joinpath("tokens.txt")),
+            encoder=str(model_dir.joinpath("encoder.int8.onnx")),
+            decoder=str(model_dir.joinpath("decoder.int8.onnx")),
+            joiner=str(model_dir.joinpath("joiner.int8.onnx")),
             num_threads=8,
             decoding_method="greedy_search",
         )
