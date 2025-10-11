@@ -36,8 +36,8 @@ def version_callback(value: bool):
         try:
             import importlib.metadata
 
-            version = importlib.metadata.version("moves")
-            typer.echo(f"moves version {version}")
+            version = importlib.metadata.version("moves-cli")
+            typer.echo(f"moves-cli version {version}")
         except Exception:
             typer.echo("Error retrieving version")
         raise typer.Exit()
