@@ -117,7 +117,7 @@ For a detailed explanation of the system's architecture, components, and design,
 
 ## Tests
 
-`moves` includes a focused test suite with 48 critical tests. The test system uses `pytest` and emphasizes integration testing over exhaustive unit testing.
+`moves` includes a test suite. The test system uses `pytest`.
 
 ### Running Tests
 
