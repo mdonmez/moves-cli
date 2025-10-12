@@ -1,6 +1,6 @@
 [project]
 name = "moves-cli"
-version = "0.2.2"
+version = "0.2.2.1"
 description = "Presentation control, reimagined."
 readme = "README.md"
 authors = [
