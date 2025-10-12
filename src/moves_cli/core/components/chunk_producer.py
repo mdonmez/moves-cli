@@ -26,7 +26,7 @@ def generate_chunks(sections: list[Section], window_size: int = 12) -> list[Chun
 def get_candidate_chunks(
     current_section: Section, all_chunks: list[Chunk]
 ) -> list[Chunk]:
-    idx = int(current_section.section_index)
+    idx = current_section.section_index
     start, end = idx - 2, idx + 3
 
     return [
