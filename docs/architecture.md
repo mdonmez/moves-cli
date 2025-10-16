@@ -1,35 +1,215 @@
-# Architecture
+# System Architecture
 
-The `moves` system is architected around a distinct separation of concerns, dividing its operation into an offline data preparation pipeline and a real-time presentation control engine. This dual-phase design maximizes live performance by pre-processing all computationally intensive tasks. The architecture is layered, comprising a Command-Line Interface (CLI), a Data Management Layer, a Data Preparation Pipeline, and a Real-time Control Engine.
+## Design Philosophy
+
+The `moves` system follows a dual-phase architecture that separates offline data preparation from real-time presentation control. This design ensures optimal performance during live presentations by completing all computationally intensive processing beforehand.
+
+The system is organized into four distinct architectural layers:
+1. **Command-Line Interface (CLI)** - User interaction layer
+2. **Data Management Layer** - File system and configuration handling
+3. **Data Preparation Pipeline** - Offline AI-powered data processing
+4. **Real-time Control Engine** - Live presentation navigation
 
 ## System Components
 
 ### 1. Command-Line Interface (CLI)
 
-The CLI, built with the Typer library, serves as the exclusive user-facing entry point. It translates user commands, arguments, and options into calls to the underlying manager classes. It is responsible for validating user input (e.g., file paths), orchestrating the application's workflow, and providing structured, informative feedback to the user.
+The CLI serves as the exclusive entry point for user interactions with the system. Built with the [Typer](https://typer.tiangolo.com/) library, it provides a clean, structured interface for all operations.
+
+**Key Responsibilities:**
+- **Input Validation:** Verifies file paths, speaker identifiers, and configuration parameters before execution
+- **Workflow Orchestration:** Coordinates operations across different manager classes
+- **User Feedback:** Provides clear, actionable feedback for successful operations and error conditions
+- **Command Routing:** Translates user commands into appropriate manager method calls
+
+The CLI is implemented in `main.py` and exposes three primary command groups: `speaker`, `presentation`, and `settings`.
 
 ### 2. Data Management Layer
 
-This foundational layer governs all file system interactions within the sandboxed `~/.moves` directory, ensuring data integrity and consistency.
+This foundational layer manages all file system operations and configuration, ensuring data integrity and system consistency. All data is stored within the sandboxed `~/.moves` directory.
 
-- **Settings Management (`SettingsEditor`):** Manages global configurations stored in `~/.moves/settings.toml`. It utilizes the `tomlkit` library to parse and write settings, which preserves comments and file structure from the system template. On initialization, it merges the default template with the user's settings, ensuring robustness and providing a clear configuration schema.
-- **Speaker Management (`SpeakerManager`):** Orchestrates the lifecycle of speaker profiles. Each speaker is assigned a unique directory (`~/.moves/speakers/<speaker_id>/`) containing their metadata (`speaker.json`), local copies of their source files, and the processed `sections.json` data. The manager implements logic to resolve speaker profiles from either a unique ID or a name, handling potential ambiguities when multiple speakers share the same name.
-- **File System Abstraction (`data_handler`):** A critical utility that centralizes all file system operations. It ensures that all file paths are resolved relative to the `~/.moves` root directory, creating a secure sandbox that prevents the application from accessing or modifying files outside its designated data folder.
+#### Settings Management (`SettingsEditor`)
+
+Manages global configuration in `~/.moves/settings.toml` using the `tomlkit` library for TOML parsing and writing.
+
+**Features:**
+- **Template-Based Configuration:** Merges a system template (`settings_template.toml`) with user settings, preserving comments and structure
+- **Initialization:** On first run, copies the template to the user's data directory; on subsequent runs, merges template defaults with user values
+- **Validation:** Ensures all configuration keys are valid and properly typed
+
+**Configuration Parameters:**
+- `model` - LLM model identifier (e.g., `openai/gpt-4o-mini`)
+- `key` - API key for the selected LLM provider
+
+#### Speaker Management (`SpeakerManager`)
+
+Orchestrates the complete lifecycle of speaker profiles, from creation to deletion.
+
+**Profile Structure:**
+Each speaker profile resides in a unique directory: `~/.moves/speakers/<speaker_id>/`
+
+**Directory Contents:**
+- `speaker.json` - Profile metadata (name, ID, source file paths)
+- `presentation.pdf` - Local copy of the presentation file
+- `transcript.pdf` - Local copy of the transcript file
+- `sections.json` - Processed data output (indicates "Ready" status)
+
+**Resolution Logic:**
+The `resolve()` method accepts either a speaker name or unique ID. When multiple speakers share the same name, it prompts the user to specify the exact speaker ID.
+
+#### File System Abstraction (`data_handler`)
+
+A critical utility that centralizes all file system operations and enforces the security sandbox.
+
+**Security Features:**
+- All file paths are resolved relative to `~/.moves`
+- Prevents access to files outside the designated data folder
+- Provides consistent error handling for I/O operations
+- Ensures UTF-8 encoding for all text operations
 
 ### 3. Data Preparation Pipeline
 
-This offline pipeline, triggered by the `moves speaker process` command, transforms raw user inputs (PDFs) into a structured data format optimized for real-time analysis. The process is designed to be idempotent and can be re-run to update a speaker's data.
+This offline pipeline transforms raw PDF inputs into structured, optimized data for real-time analysis. Triggered by `moves speaker process`, the pipeline is idempotent and can be re-run to update speaker data.
 
-- **Section Production (`section_producer`):** This is the first and most intelligent stage. It employs `PyMuPDF` for raw text extraction from the presentation and transcript. The core of this component is its interaction with a Large Language Model (LLM) through `litellm` (providing a universal API) and `instructor`. `instructor` enforces a Pydantic data model on the LLM's output, guaranteeing that the response is a well-structured list of sections that exactly matches the number of presentation slides. The LLM is guided by a sophisticated system prompt that instructs it to perform a semantic alignment task: segmenting the monolithic transcript into "Sections," each corresponding to the core topic of a single slide.
-- **Chunk Production (`chunk_producer`):** This stage consumes the `sections.json` file to produce "Chunks." A sliding window algorithm moves across the entire corpus of section text, one word at a time, creating overlapping text segments of a fixed length (e.g., 12 words). Each chunk retains metadata linking it back to its source sections. This process creates a highly granular and redundant dataset that is resilient to variations in spoken delivery.
+#### Section Production (`section_producer`)
+
+The AI-powered semantic alignment stage that segments transcripts to match presentation slides.
+
+**Process Flow:**
+
+1. **PDF Text Extraction** (via `PyMuPDF`):
+   - **Presentation:** Extracts text page-by-page, preserving slide structure for topical guidance
+   - **Transcript:** Extracts complete text as a continuous narrative for segmentation
+
+2. **LLM-Powered Alignment:**
+   - **Technology Stack:**
+     - `litellm` - Provides a universal API for multiple LLM providers (OpenAI, Gemini, etc.)
+     - `instructor` - Enforces structured Pydantic output models with automatic validation and retry logic
+   
+   - **Output Validation:** The `SectionsOutputModel` Pydantic model ensures:
+     - Exactly one section per presentation slide
+     - Proper data types and constraints
+     - Automatic retry if LLM output is malformed
+
+3. **Prompt Engineering:**
+   The system prompt (`llm_instruction.md`) defines strict alignment rules:
+   - **One-to-One Mapping:** Generate exactly one text segment per slide
+   - **Source Authority:** Extract content exclusively from the transcript
+   - **Semantic Focus:** Match slide topics to transcript content, ignoring superficial elements
+   - **Fallback Strategy:** If a slide topic is absent from the transcript, synthesize a brief, contextually appropriate sentence
+
+4. **Output Persistence:**
+   Validated sections are serialized to `sections.json` in the speaker's directory, marking the profile as ready for presentation.
+
+#### Chunk Production (`chunk_producer`)
+
+Transforms sections into overlapping text segments optimized for real-time similarity matching.
+
+**Sliding Window Algorithm:**
+
+1. **Word Corpus Construction:**
+   - Tokenizes all section content into tuples: `(word, source_section)`
+   - Maintains metadata linking each word to its originating section
+
+2. **Window Iteration:**
+   - Default window size: 12 words
+   - Slides one word at a time across the entire corpus
+   - Creates overlapping chunks from position 0 to `(n - window_size)`
+
+3. **Chunk Object Creation:**
+   Each chunk contains:
+   - `partial_content` - Normalized 12-word text segment
+   - `source_sections` - Sorted list of sections the chunk spans (by `section_index`)
+
+**Design Benefits:**
+- **Granularity:** Short phrases enable precise matching
+- **Overlap:** Increases match probability for varied speech delivery
+- **Performance:** Real-time comparison against small text segments is computationally efficient
+- **Resilience:** Handles out-of-order delivery and ad-libbed content
 
 ### 4. Real-time Control Engine
 
-Activated by the `moves presentation control` command, this engine manages the live, voice-controlled session using a multi-threaded architecture to ensure non-blocking performance.
+Activated by `moves presentation control`, this engine manages live voice-controlled presentations using a multi-threaded architecture for non-blocking, responsive performance.
 
-- **Streaming Speech-to-Text (STT):** An `OnlineRecognizer` from the `sherpa-onnx` library, configured with a local Nemo transducer model, performs continuous, low-latency transcription. Audio is captured in 100ms frames by `sounddevice`, buffered in a `deque`, and fed to the recognizer in a dedicated thread.
-- **Similarity Calculation (`SimilarityCalculator`):** This component performs the core real-time analysis. For each new phrase transcribed by the STT engine, it compares the phrase against a dynamically selected subset of "candidate chunks." The comparison is a hybrid model:
-  - **Semantic Similarity:** The `fastembed` library generates vector embeddings for the spoken text and candidate chunks using the `all-MiniLM-l6-v2` model. The cosine similarity between these vectors is calculated to evaluate closeness in meaning.
-  - **Phonetic Similarity:** The `jellyfish` library generates Metaphone phonetic keys for the text, and `rapidfuzz` calculates the similarity ratio between these keys. This provides resilience to homophones and minor pronunciation errors.
-  - **Weighted Scoring:** Raw scores from both methods are independently normalized using a min-max scaling algorithm after filtering out low-confidence initial matches. These normalized scores are then combined into a final score using configurable weights, providing a balanced assessment of similarity.
-- **Presentation Navigation:** The engine identifies the chunk with the highest final similarity score. It determines the target slide by examining the last source section associated with that chunk. The difference between the target and current slide indices dictates the required navigation (e.g., a positive difference triggers Right Arrow key presses). The `pynput` library simulates these keyboard events. A parallel `pynput` listener thread concurrently monitors for manual keyboard input, allowing the user to override the automatic navigation or pause the system at any time.
+#### Streaming Speech-to-Text (STT)
+
+**Technology:**
+- **Library:** `sherpa-onnx` - High-performance offline speech recognition using ONNX Runtime
+- **Model:** Pre-trained Nemo transducer model optimized for streaming applications
+- **Decoding:** Greedy search algorithm for minimal latency (selects most probable token at each step)
+
+**Multi-Threaded Audio Pipeline:**
+
+1. **Audio Capture (Main Thread):**
+   - `sounddevice` library captures audio from the default microphone
+   - 100ms frames at 16,000 Hz sample rate
+   - Registered callback function processes each frame
+
+2. **Asynchronous Buffering:**
+   - Audio frames are placed in a thread-safe `deque` buffer
+   - Decouples high-priority audio capture from STT processing
+   - Handles variable workload without blocking
+
+3. **STT Processing (Dedicated Thread):**
+   - Continuously pulls frames from the `deque`
+   - Feeds audio to `OnlineRecognizer` via `accept_waveform()`
+   - Incremental processing: `is_ready()` → `decode_stream()` → `get_result()`
+   - Outputs raw transcribed text
+
+4. **Text Normalization:**
+   - Applies `text_normalizer` to ensure format matches pre-processed chunks
+   - Maintains sliding window of 12 most recent normalized words
+   - Passes normalized text to similarity calculator
+
+#### Similarity Calculation (`SimilarityCalculator`)
+
+The core real-time analysis component that determines slide transitions.
+
+**Hybrid Scoring Model:**
+
+1. **Semantic Similarity:**
+   - **Technology:** `fastembed` library with `all-MiniLM-l6-v2` embedding model
+   - **Process:** Generates vector embeddings for spoken text and candidate chunks
+   - **Metric:** Cosine similarity between vectors (measures semantic closeness)
+
+2. **Phonetic Similarity:**
+   - **Technology:** `jellyfish` (Metaphone encoding) + `rapidfuzz` (fuzzy matching)
+   - **Process:**
+     - Generate phonetic keys for both texts (e.g., "phonetics" → "FNTKS")
+     - Calculate Levenshtein distance-based similarity
+     - Normalize to 0.0-1.0 scale
+   - **Purpose:** Resilience to homophones and pronunciation errors
+   - **Optimization:** LRU caching for recently heard phrases
+
+3. **Score Normalization and Weighting:**
+   - **Normalization:** Independent min-max scaling for semantic and phonetic scores
+     - Filters scores below 0.5 confidence threshold
+     - Maps remaining scores to 0.0-1.0 range within candidate set
+   - **Weighted Combination:** Default weights: 60% semantic + 40% phonetic
+   - **Output:** Sorted list of `SimilarityResult` objects by final weighted score
+
+**Candidate Chunk Selection:**
+- **Look-ahead/Look-behind Window:** Current slide ± contextual range
+  - Range: `[current_index - 2, current_index + 3]`
+- **Filtering Strategy:**
+  - Include chunks where all source sections fall within window
+  - Exclude single-section chunks at window edges (prevents premature matching)
+
+#### Presentation Navigation
+
+**Navigation Logic:**
+1. Identifies chunk with highest similarity score
+2. Determines target slide from chunk's last source section
+3. Calculates navigation delta: `target_slide - current_slide`
+4. Simulates keyboard events via `pynput` (e.g., Right Arrow keypresses)
+
+**Manual Override:**
+- Parallel `pynput` keyboard listener thread monitors user input
+- Supports pause/resume and manual navigation
+- Allows complete user control at any time
+
+**Thread Architecture:**
+- Main thread: Audio capture and system coordination
+- STT thread: Speech recognition processing
+- Navigator thread: Similarity calculation and navigation
+- Listener thread: Keyboard input monitoring
