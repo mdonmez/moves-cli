@@ -1,21 +1,40 @@
-# About `moves` - Technical Details
+# Technical Deep Dive
 
-This section provides a granular, in-depth exploration of the internal architecture, operational logic, and key design decisions behind the `moves` system. Each document below details a specific component or concept, offering a comprehensive technical understanding of how the system functions from data preparation to live presentation control.
+This section provides comprehensive technical documentation of the `moves` system's internal architecture, implementation details, and design decisions. Each document explores a specific component or concept in depth.
 
-- **[Speaker Management](speaker-management.md):** Delves into the "Speaker" entity, detailing its data structure, storage on the file system, and the complete lifecycle managed by the `SpeakerManager`, including asynchronous processing.
+## Core System Components
 
-- **[Section Generation](sections.md):** Explains the LLM-powered semantic alignment process that uses structured prompting and output modeling via `instructor` to intelligently segment speaker transcripts.
+### [Speaker Management](speaker-management.md)
+Explores the Speaker entity, its data structure, file system storage, and complete lifecycle management by the `SpeakerManager`. Covers profile creation, modification, asynchronous processing, and resolution logic.
 
-- **[Chunk Generation](chunks.md):** Provides a precise breakdown of the sliding window algorithm used to create overlapping text "Chunks" and the logic behind selecting a relevant subset of "candidate chunks" for real-time analysis.
+### [Settings Management](editing-settings.md)
+Details the configuration system, including TOML-based settings storage, template merging, validation, and the role of `tomlkit` in preserving file structure and comments.
 
-- **[Similarity Calculations](similarity-calculations.md):** Outlines the hybrid analysis engine, detailing the semantic vector comparison, phonetic key matching, and the score normalization and weighting strategy.
+## Data Processing Pipeline
 
-- **[Streaming Speech-to-Text](streaming-stt.md):** Covers the low-latency, multi-threaded audio processing pipeline, including the role of the `sherpa-onnx` transducer model and the greedy search decoding method.
+### [Section Generation](sections.md)
+Examines the LLM-powered semantic alignment process that segments speaker transcripts to match presentation slides. Covers PDF extraction, structured prompting, output validation via `instructor`, and the alignment task specification.
 
-- **[Data Models](data-models.md):** Defines the core data structures (`Speaker`, `Section`, `Chunk`, etc.) and their roles in facilitating the flow of information throughout the system's different architectural layers.
+### [Chunk Generation](chunks.md)
+Analyzes the sliding window algorithm that creates overlapping text chunks from sections. Explains the rationale, chunk object structure, and candidate chunk selection logic for real-time matching.
 
-- **[Editing Settings](editing-settings.md):** Explains the robust configuration management system, the role of the `tomlkit` library in preserving file structure, and the process of merging user settings with system defaults.
+## Real-Time Control Components
 
-- **[Utilities](utilities.md):** Provides an overview of the essential helper modules responsible for sandboxed file handling, canonical text normalization, unique ID generation, and component-isolated logging.
+### [Similarity Calculations](similarity-calculations.md)
+Dissects the hybrid similarity engine combining semantic vector comparison and phonetic key matching. Details score normalization, weighting strategy, and the mathematical approach to determining slide transitions.
 
-- **[Test System](tests.md):** The documentation describes a test package covering critical CLI workflows, core business logic, data processing components, and auxiliary functions.
+### [Streaming Speech-to-Text](streaming-stt.md)
+Investigates the low-latency, multi-threaded audio processing pipeline. Covers the `sherpa-onnx` transducer model, greedy search decoding, audio buffering, and text normalization for matching.
+
+## Data and Infrastructure
+
+### [Data Models](data-models.md)
+Documents the core data structures (`Speaker`, `Section`, `Chunk`, `SimilarityResult`, etc.) and their roles in facilitating information flow throughout the system.
+
+### [Utilities](utilities.md)
+Describes essential helper modules: sandboxed file handling (`data_handler`), canonical text normalization (`text_normalizer`), unique ID generation (`id_generator`), and component-isolated logging.
+
+## Quality Assurance
+
+### [Test System](tests.md)
+Outlines the comprehensive test suite covering CLI workflows, core business logic, data processing components, and utility functions. Details test organization, coverage areas, and mocking strategies for hardware dependencies.

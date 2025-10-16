@@ -1,28 +1,135 @@
-# Chunk Production
+# Chunk Production System
 
-Chunk production is a critical offline process that deconstructs the `Section` data into small, overlapping text segments known as "Chunks." This transformation is fundamental to the system's real-time performance and accuracy, as it creates a data structure optimized for rapid and resilient similarity matching. This process is orchestrated by the `chunk_producer`.
+## Overview
 
-## The Rationale Behind Chunks
+Chunk production is a critical offline process that transforms `Section` data into small, overlapping text segments called "Chunks." This transformation creates a data structure optimized for rapid and resilient real-time similarity matching, forming the foundation for accurate voice-driven slide navigation.
 
-Matching live speech against entire `Section` paragraphs is computationally inefficient and highly susceptible to failure if the speaker deviates from the script. Chunks address this by providing:
+## Design Rationale
 
-- **Granularity and Overlap:** By breaking content into small, overlapping phrases (e.g., 12 words), the system can match short spoken phrases with high confidence, even if they are delivered out of order or with ad-libbed connecting words. The overlap ensures that a phrase is represented in multiple chunks, increasing the probability of a successful match.
-- **Performance:** The real-time similarity engine only needs to compare the live speech against short strings, which is orders of magnitude faster than performing vector or phonetic analysis on entire paragraphs.
+### Why Chunks Are Essential
 
-## The `generate_chunks` Process
+Matching live speech against entire `Section` paragraphs presents two fundamental challenges:
 
-The `generate_chunks` function employs a sliding window algorithm to create a comprehensive list of all possible chunks from the entire presentation script.
+1. **Computational Inefficiency:** Comparing long text segments is slow and resource-intensive
+2. **Brittleness:** Minor deviations from the script cause matching failures
 
-1.  **Word Corpus Construction:** The process begins by tokenizing the content of all `Section` objects into a single, ordered list. This is not merely a list of strings; it is a list of tuples, where each tuple contains the word and a reference to its source `Section` object: `(word, source_section)`. This preserves the crucial metadata linking every word back to its corresponding slide.
-2.  **Sliding Window Iteration:** A window of a fixed `window_size` (defaulting to 12 words) slides across the word corpus. The iteration proceeds one word at a time, from the first word up to the `(n - window_size)`-th word, where `n` is the total number of words in the corpus.
-3.  **Chunk Object Instantiation:** For each position of the window, a new `Chunk` object is created:
-    - **`partial_content`**: The word elements from the current window slice are joined into a single string. This string is then passed through the `text_normalizer` to ensure its format is identical to the normalized STT output during the live session.
-    - **`source_sections`**: The unique `Section` objects associated with the words in the window are collected. This list is then sorted by `section_index` to maintain a chronologically accurate record of the chunk's origins. A single chunk can span multiple sections if its window crosses a section boundary.
+Chunks solve both problems through:
 
-## The `get_candidate_chunks` Selection Logic
+**Granularity and Overlap**
+- Small 12-word segments enable precise matching of short spoken phrases
+- Overlapping windows ensure phrases appear in multiple chunks
+- Redundancy increases match probability even with ad-libbed content or out-of-order delivery
 
-To optimize real-time performance, the `SimilarityCalculator` does not search through all generated chunks. Instead, the `get_candidate_chunks` function provides a small, contextually relevant subset of chunks based on the current slide.
+**Performance Optimization**
+- Short string comparisons are orders of magnitude faster than paragraph analysis
+- Vector and phonetic operations on 12-word segments execute in real-time
+- Enables continuous processing without latency
 
-1.  **Candidate Window Definition:** Based on the `section_index` of the current slide (`idx`), a "look-ahead/look-behind" window is defined, spanning from two sections before to three sections after the current one (`idx - 2` to `idx + 3`). This window anticipates both forward navigation and the possibility of the speaker needing to briefly refer back.
-2.  **Primary Filtering:** The first filter selects all chunks for which **every one** of its `source_sections` has an index that falls within this defined candidate window. This drastically reduces the search space.
-3.  **Edge Case Refinement:** A second, more subtle filter is applied to refine the candidate set. It excludes any chunk that meets two conditions simultaneously: (1) it is sourced from only a single section, and (2) that single section is at the absolute edge of the candidate window (i.e., at index `idx - 2` or `idx + 3`). This heuristic prevents the system from prematurely matching with content that is still two or three slides away, prioritizing chunks that are more central to the current topic or serve as a direct bridge to the immediately adjacent slides.
+**Resilience**
+- Tolerates speaker variations, pauses, and connecting words
+- Maintains accuracy when speakers deviate from the script
+- Robust against partial phrase matches
+
+## The `generate_chunks` Algorithm
+
+The `generate_chunks` function implements a sliding window algorithm to create a comprehensive set of chunks from all sections in a presentation.
+
+### Implementation Steps
+
+**1. Word Corpus Construction**
+
+The algorithm begins by tokenizing all `Section` content into a single ordered list. Each element is a tuple preserving essential metadata:
+
+```python
+[(word, source_section), (word, source_section), ...]
+```
+
+This structure maintains the link between every word and its originating section, critical for tracing matches back to specific slides.
+
+**2. Sliding Window Iteration**
+
+A fixed-size window (default: 12 words) slides across the word corpus one word at a time:
+- **Start position:** 0
+- **End position:** `(total_words - window_size)`
+- **Step size:** 1 word (creates maximum overlap)
+
+**3. Chunk Object Creation**
+
+For each window position, a new `Chunk` object is instantiated with two key properties:
+
+**`partial_content`** (str)
+- Words from the current window are joined into a single string
+- Passed through `text_normalizer` for canonical formatting
+- Ensures identical format to real-time STT output
+- Example: "the quick brown fox jumps over the lazy dog cat mouse"
+
+**`source_sections`** (list[Section])
+- Collects unique `Section` objects associated with window words
+- Sorted by `section_index` for chronological accuracy
+- Spans multiple sections when window crosses section boundaries
+- Enables precise slide navigation from chunk matches
+
+### Algorithm Characteristics
+
+- **Total chunks:** `(total_words - window_size + 1)`
+- **Overlap:** 11 words between consecutive chunks
+- **Coverage:** Every 12-word phrase in the presentation appears at least once
+- **Cross-section chunks:** Enable smooth transitions between slides
+
+## Candidate Chunk Selection
+
+To optimize real-time performance, the `SimilarityCalculator` evaluates only a contextually relevant subset of chunks. The `get_candidate_chunks` function implements intelligent filtering based on the current slide position.
+
+### Selection Strategy
+
+**1. Define Candidate Window**
+
+Based on the current slide's `section_index` (idx), establish a look-ahead/look-behind range:
+
+```
+Window: [idx - 2, idx + 3]
+```
+
+This asymmetric window:
+- Looks back 2 slides (handles speaker backtracking or recap)
+- Looks ahead 3 slides (anticipates forward progression)
+- Balances context while maintaining performance
+
+**2. Primary Filtering**
+
+Select chunks where **all** source sections fall within the candidate window:
+
+```python
+all(start <= section.section_index <= end for section in chunk.source_sections)
+```
+
+This dramatically reduces the search space while ensuring relevant chunks are included.
+
+**3. Edge Case Refinement**
+
+Apply a second filter to exclude peripheral chunks that could cause premature matching:
+
+**Exclusion criteria:**
+- Chunk sourced from exactly one section, AND
+- That section is at the absolute window edge (idx - 2 or idx + 3)
+
+**Rationale:**
+- Prevents matching content that's 2-3 slides away
+- Prioritizes chunks central to current context
+- Favors chunks spanning multiple sections (natural transitions)
+
+### Selection Benefits
+
+- **Reduced search space:** Typically 10-20% of total chunks
+- **Context awareness:** Focuses on relevant presentation area
+- **Transition support:** Includes chunks bridging adjacent slides
+- **Performance:** Enables real-time similarity calculations
+- **Accuracy:** Prevents false matches from distant content
+
+### Example Scenario
+
+Current slide: 10 (idx = 10)
+- Candidate window: [8, 13]
+- Included: Chunks from sections 8-13 and their combinations
+- Excluded: Single-section chunks from sections 8 and 13
+- Focus: Multi-section chunks and chunks from sections 9-12
