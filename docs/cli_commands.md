@@ -1,88 +1,90 @@
-# moves CLI Reference
+# CLI Reference Guide
 
-The `moves` command-line interface provides a comprehensive toolset for managing and controlling your presentations directly from the terminal. This guide details all commands, options, and common workflows.
+The `moves` command-line interface provides comprehensive tools for managing voice-controlled presentations. This guide documents all commands, their options, and practical usage examples.
 
-## Get Started
+## Quick Start Guide
 
-Get up and running with `moves` in three steps.
+Get `moves` running in three simple steps:
 
 ### 1. Configure Your AI Model
 
-First, configure the AI model and API key.
+Set up the LLM for processing presentation data.
 
-> **Note:** Find compatible models at [LiteLLM Supported Models](https://models.litellm.ai/).
+> **Note:** Browse compatible models at [LiteLLM Supported Models](https://models.litellm.ai/).
 
 ```bash
-# Set the desired model
+# Configure the model
 moves settings set model openai/gpt-4o-mini
 
-# Set your API key
+# Configure your API key
 moves settings set key YOUR_API_KEY
 ```
 
 ### 2. Add and Process a Speaker
 
-Next, add a speaker profile using their presentation and transcript files. Both files must be in PDF format.
+Create a speaker profile with presentation and transcript files (both must be PDF format).
 
 ```bash
-# Add a speaker with their presentation and transcript
+# Add speaker profile
 moves speaker add "Speaker Name" ./presentation.pdf ./transcript.pdf
 
-# Process the speaker's data for AI control
+# Process data for AI-powered control
 moves speaker process "Speaker Name"
 ```
 
-### 3. Start the Presentation
+### 3. Launch Presentation Control
 
-Finally, launch the presentation control session.
+Start the voice-controlled presentation session.
 
 ```bash
 moves presentation control "Speaker Name"
 ```
 
-Focus the presentation window, and `moves` will handle the slide transitions as you speak.
-
----
+Open your presentation in fullscreen mode, and `moves` will handle slide transitions based on your speech.
 
 ## Command Structure
 
-All `moves` commands follow a consistent structure:
+All `moves` commands follow a consistent hierarchical structure:
 
 ```
-moves [GLOBAL_OPTIONS] <SUBCOMMAND> <ACTION> [ARGUMENTS] [OPTIONS]
+moves [GLOBAL_OPTIONS] <COMMAND> <ACTION> [ARGUMENTS] [OPTIONS]
 ```
 
-**Subcommands:**
+**Available Commands:**
 
-- **`speaker`**: Manage speaker profiles, files, and data processing.
-- **`presentation`**: Control the live presentation flow.
-- **`settings`**: Configure the application's AI model and API key.
+| Command        | Purpose                                          |
+| :------------- | :----------------------------------------------- |
+| `speaker`      | Manage speaker profiles, files, and processing   |
+| `presentation` | Control live voice-activated presentation flow   |
+| `settings`     | Configure LLM model and API key                  |
 
 **Global Options:**
 
-- `--help`: Show help information for a command.
-- `--version`: Display the application's version.
+| Option      | Description                           |
+| :---------- | :------------------------------------ |
+| `--help`    | Display help information for commands |
+| `--version` | Show application version              |
 
----
+## `speaker` Command
 
-## `speaker` Subcommand
+Manages speaker profiles, associated files, and AI data processing.
 
-Manages speaker profiles, their associated files, and AI processing.
+### Available Actions
 
-| Action    | Description                                     |
-| :-------- | :---------------------------------------------- |
-| `add`     | Creates a new speaker profile.                  |
-| `edit`    | Updates the file paths for an existing speaker. |
-| `list`    | Displays all registered speakers.               |
-| `show`    | Shows detailed information for a speaker.       |
-| `process` | Processes speaker data for AI navigation.       |
-| `delete`  | Removes one or more speakers and their data.    |
+| Action    | Purpose                                          |
+| :-------- | :----------------------------------------------- |
+| `add`     | Create a new speaker profile                     |
+| `edit`    | Update file paths for an existing speaker        |
+| `list`    | Display all registered speakers                  |
+| `show`    | View detailed information for a specific speaker |
+| `process` | Process speaker data for AI navigation           |
+| `delete`  | Remove speaker profiles and their data           |
 
-### `add`
+### `speaker add`
 
-Creates a new speaker profile.
+Creates a new speaker profile with associated presentation and transcript files.
 
-**Usage:**
+**Syntax:**
 
 ```bash
 moves speaker add <NAME> <SOURCE_PRESENTATION> <SOURCE_TRANSCRIPT>
@@ -90,11 +92,11 @@ moves speaker add <NAME> <SOURCE_PRESENTATION> <SOURCE_TRANSCRIPT>
 
 **Arguments:**
 
-| Argument              | Description                                  |
-| :-------------------- | :------------------------------------------- |
-| `name`                | The speaker's name. **(Required)**           |
-| `source_presentation` | Path to the presentation PDF. **(Required)** |
-| `source_transcript`   | Path to the transcript PDF. **(Required)**   |
+| Argument              | Type     | Description                       |
+| :-------------------- | :------- | :-------------------------------- |
+| `name`                | Required | Speaker's name                    |
+| `source_presentation` | Required | Path to presentation PDF file     |
+| `source_transcript`   | Required | Path to transcript PDF file       |
 
 **Example:**
 
@@ -102,11 +104,19 @@ moves speaker add <NAME> <SOURCE_PRESENTATION> <SOURCE_TRANSCRIPT>
 moves speaker add "John Doe" ./presentation.pdf ./transcript.pdf
 ```
 
-### `edit`
+**Output:**
+```
+Speaker 'John Doe' (john-doe-a1b2c) added.
+    ID -> john-doe-a1b2c
+    Presentation -> /path/to/presentation.pdf
+    Transcript -> /path/to/transcript.pdf
+```
 
-Updates the presentation or transcript file path for a speaker.
+### `speaker edit`
 
-**Usage:**
+Updates presentation or transcript file paths for an existing speaker profile.
+
+**Syntax:**
 
 ```bash
 moves speaker edit <SPEAKER> [OPTIONS]
@@ -114,45 +124,55 @@ moves speaker edit <SPEAKER> [OPTIONS]
 
 **Arguments:**
 
-| Argument  | Description                                   |
-| :-------- | :-------------------------------------------- |
-| `speaker` | The name or ID of the speaker. **(Required)** |
+| Argument  | Type     | Description                        |
+| :-------- | :------- | :--------------------------------- |
+| `speaker` | Required | Speaker name or unique ID          |
 
 **Options:**
 
-| Option                 | Description                     |
-| :--------------------- | :------------------------------ |
-| `-p`, `--presentation` | The new presentation file path. |
-| `-t`, `--transcript`   | The new transcript file path.   |
+| Option                 | Description                      |
+| :--------------------- | :------------------------------- |
+| `-p`, `--presentation` | New presentation PDF file path   |
+| `-t`, `--transcript`   | New transcript PDF file path     |
 
 **Examples:**
 
 ```bash
-# Update the presentation file
+# Update presentation file
 moves speaker edit "John Doe" --presentation ./new_presentation.pdf
 
-# Update the transcript file
+# Update transcript file
 moves speaker edit "John Doe" --transcript ./new_transcript.pdf
 
 # Update both files using short options
 moves speaker edit "John Doe" -p ./new_slides.pdf -t ./new_speech.pdf
+
+# Edit by speaker ID
+moves speaker edit john-doe-a1b2c --presentation ./updated.pdf
 ```
 
-### `list`
+### `speaker list`
 
-Displays all registered speakers.
+Displays all registered speaker profiles.
 
-**Usage:**
+**Syntax:**
 
 ```bash
 moves speaker list
 ```
 
-### `show`
+**Example Output:**
+```
+Registered Speakers:
+  1. John Doe (john-doe-a1b2c) - Ready
+  2. Jane Smith (jane-smith-x7y8z) - Pending Processing
+```
 
-Provides detailed information about a specific speaker.
+### `speaker show`
 
-**Usage:**
+Displays detailed information about a specific speaker profile.
+
+**Syntax:**
 
 ```bash
 moves speaker show <SPEAKER>
@@ -160,25 +180,35 @@ moves speaker show <SPEAKER>
 
 **Arguments:**
 
-| Argument  | Description                                   |
-| :-------- | :-------------------------------------------- |
-| `speaker` | The name or ID of the speaker. **(Required)** |
+| Argument  | Type     | Description               |
+| :-------- | :------- | :------------------------ |
+| `speaker` | Required | Speaker name or unique ID |
 
 **Examples:**
 
 ```bash
-# Show speaker details by name
+# Show details by name
 moves speaker show "John Doe"
 
-# Show speaker details by ID
-moves speaker show speaker-123
+# Show details by ID
+moves speaker show john-doe-a1b2c
 ```
 
-### `process`
+**Example Output:**
+```
+Speaker: John Doe
+ID: john-doe-a1b2c
+Status: Ready
+Presentation: /home/user/slides/presentation.pdf
+Transcript: /home/user/docs/transcript.pdf
+Sections: 25
+```
 
-Processes speaker data using the configured AI model for live control.
+### `speaker process`
 
-**Usage:**
+Processes speaker data using the configured LLM to enable AI-powered presentation control. This step uses the LLM to segment the transcript and align it with presentation slides.
+
+**Syntax:**
 
 ```bash
 moves speaker process [SPEAKERS]... [OPTIONS]
@@ -186,34 +216,42 @@ moves speaker process [SPEAKERS]... [OPTIONS]
 
 **Arguments:**
 
-| Argument   | Description                                                |
-| :--------- | :--------------------------------------------------------- |
-| `speakers` | A space-separated list of speaker names or IDs to process. |
+| Argument   | Type     | Description                                    |
+| :--------- | :------- | :--------------------------------------------- |
+| `speakers` | Optional | Space-separated list of speaker names or IDs  |
 
 **Options:**
 
-| Option        | Description           |
-| :------------ | :-------------------- |
-| `-a`, `--all` | Process all speakers. |
+| Option        | Description                  |
+| :------------ | :--------------------------- |
+| `-a`, `--all` | Process all speaker profiles |
 
 **Examples:**
 
 ```bash
-# Process a specific speaker
+# Process a single speaker
 moves speaker process "John Doe"
 
 # Process multiple speakers
 moves speaker process "John Doe" "Jane Smith"
 
-# Process all speakers
+# Process by speaker ID
+moves speaker process john-doe-a1b2c
+
+# Process all registered speakers
 moves speaker process --all
 ```
 
-### `delete`
+**Notes:**
+- Requires valid LLM configuration (`moves settings set model` and `moves settings set key`)
+- Processing time depends on presentation size and LLM response time
+- Re-running this command updates the speaker's processed data
 
-Removes one or more speakers and their associated data.
+### `speaker delete`
 
-**Usage:**
+Permanently removes speaker profiles and all associated data.
+
+**Syntax:**
 
 ```bash
 moves speaker delete [SPEAKERS]... [OPTIONS]
@@ -221,40 +259,43 @@ moves speaker delete [SPEAKERS]... [OPTIONS]
 
 **Arguments:**
 
-| Argument   | Description                                               |
-| :--------- | :-------------------------------------------------------- |
-| `speakers` | A space-separated list of speaker names or IDs to delete. |
+| Argument   | Type     | Description                                   |
+| :--------- | :------- | :-------------------------------------------- |
+| `speakers` | Optional | Space-separated list of speaker names or IDs |
 
 **Options:**
 
-| Option        | Description          |
-| :------------ | :------------------- |
-| `-a`, `--all` | Delete all speakers. |
+| Option        | Description                  |
+| :------------ | :--------------------------- |
+| `-a`, `--all` | Delete all speaker profiles  |
 
 **Examples:**
 
 ```bash
-# Delete a specific speaker
+# Delete a single speaker
 moves speaker delete "John Doe"
 
 # Delete multiple speakers
 moves speaker delete "John Doe" "Jane Smith"
 
+# Delete by speaker ID
+moves speaker delete john-doe-a1b2c
+
 # Delete all speakers
 moves speaker delete --all
 ```
 
----
+**Warning:** This operation is irreversible and removes all speaker data including processed sections.
 
-## `presentation` Subcommand
+## `presentation` Command
 
-Controls the live presentation using voice-activated navigation.
+Controls live presentations with voice-activated navigation.
 
-### `control`
+### `presentation control`
 
-Starts a live, voice-controlled presentation session.
+Starts a voice-controlled presentation session using processed speaker data.
 
-**Usage:**
+**Syntax:**
 
 ```bash
 moves presentation control <SPEAKER>
@@ -262,9 +303,9 @@ moves presentation control <SPEAKER>
 
 **Arguments:**
 
-| Argument  | Description                                   |
-| :-------- | :-------------------------------------------- |
-| `speaker` | The name or ID of the speaker. **(Required)** |
+| Argument  | Type     | Description               |
+| :-------- | :------- | :------------------------ |
+| `speaker` | Required | Speaker name or unique ID |
 
 **Example:**
 
@@ -272,41 +313,63 @@ moves presentation control <SPEAKER>
 moves presentation control "John Doe"
 ```
 
+**Prerequisites:**
+- Speaker profile must exist
+- Speaker data must be processed (`moves speaker process`)
+- Presentation file should be open in fullscreen mode
+
 **Session Controls:**
 
-- **Voice**: Speak naturally to trigger automatic slide navigation.
-- **→ (Right Arrow)**: Manually advance to the next section.
-- **← (Left Arrow)**: Manually return to the previous section.
-- **Ins (Insert)**: Pause or resume automatic voice navigation.
-- **Ctrl+C**: Exit the control session.
+| Input                | Action                                  |
+| :------------------- | :-------------------------------------- |
+| **Voice**            | Speak naturally to trigger navigation   |
+| **→** (Right Arrow)  | Manually advance to next section        |
+| **←** (Left Arrow)   | Manually return to previous section     |
+| **Insert**           | Pause/resume automatic voice navigation |
+| **Ctrl+C**           | Exit control session                    |
 
----
+**How It Works:**
+1. System loads speech recognition models (initial delay on first run)
+2. Begins continuous audio capture from default microphone
+3. Transcribes speech in real-time
+4. Matches spoken words against processed presentation content
+5. Automatically sends keyboard commands to advance slides
+6. Maintains synchronization between speech and slide position
 
-## `settings` Subcommand
+## `settings` Command
 
-Configures the LLM model and API key.
+Configures system-wide LLM model and API key settings.
 
-| Action  | Description                            |
-| :------ | :------------------------------------- |
-| `list`  | Displays the current settings.         |
-| `set`   | Sets a new value for a setting.        |
-| `unset` | Resets a setting to its default value. |
+### Available Actions
 
-### `list`
+| Action  | Purpose                                 |
+| :------ | :-------------------------------------- |
+| `list`  | Display current configuration values    |
+| `set`   | Update a configuration setting          |
+| `unset` | Reset a setting to its default value    |
 
-Displays the current model and API key configuration.
+### `settings list`
 
-**Usage:**
+Displays current LLM model and API key configuration.
+
+**Syntax:**
 
 ```bash
 moves settings list
 ```
 
-### `set`
+**Example Output:**
+```
+Current Settings:
+  model: openai/gpt-4o-mini
+  key: sk-proj-****************************
+```
 
-Sets a new value for a specified setting.
+### `settings set`
 
-**Usage:**
+Updates a configuration setting with a new value.
+
+**Syntax:**
 
 ```bash
 moves settings set <KEY> <VALUE>
@@ -314,34 +377,45 @@ moves settings set <KEY> <VALUE>
 
 **Arguments:**
 
-| Argument | Description                                                |
-| :------- | :--------------------------------------------------------- |
-| `key`    | The name of the setting (`model` or `key`). **(Required)** |
-| `value`  | The new value for the setting. **(Required)**              |
+| Argument | Type     | Description                          |
+| :------- | :------- | :----------------------------------- |
+| `key`    | Required | Setting name (`model` or `key`)      |
+| `value`  | Required | New value for the setting            |
 
 **Valid Keys:**
 
-- `model`: The LLM model name (e.g., `openai/gpt-4o-mini`).
-- `key`: The API key for the selected LLM service.
+| Key     | Description                                          | Example Value                 |
+| :------ | :--------------------------------------------------- | :---------------------------- |
+| `model` | LLM model identifier (LiteLLM-compatible format)     | `openai/gpt-4o-mini`          |
+| `key`   | API key for the selected LLM provider                | `sk-proj-...`                 |
 
 **Examples:**
 
 ```bash
-# Set an OpenAI model
+# Configure OpenAI model
 moves settings set model openai/gpt-4o-mini
 
-# Set a Gemini model
+# Configure Google Gemini model
 moves settings set model gemini/gemini-2.0-flash
 
-# Set the API key
+# Configure Anthropic Claude model
+moves settings set model anthropic/claude-3-5-sonnet-20241022
+
+# Set API key
 moves settings set key YOUR_API_KEY_HERE
 ```
 
-### `unset`
+**Supported Model Formats:**
+- OpenAI: `openai/gpt-4o-mini`, `openai/gpt-4o`
+- Google: `gemini/gemini-2.0-flash`, `gemini/gemini-1.5-pro`
+- Anthropic: `anthropic/claude-3-5-sonnet-20241022`
+- For complete list, visit: [LiteLLM Supported Models](https://models.litellm.ai/)
 
-Resets a setting to its default value or clears it.
+### `settings unset`
 
-**Usage:**
+Resets a configuration setting to its default value or clears it.
+
+**Syntax:**
 
 ```bash
 moves settings unset <KEY>
@@ -349,67 +423,108 @@ moves settings unset <KEY>
 
 **Arguments:**
 
-| Argument | Description                                                         |
-| :------- | :------------------------------------------------------------------ |
-| `key`    | The name of the setting to reset (`model` or `key`). **(Required)** |
+| Argument | Type     | Description                          |
+| :------- | :------- | :----------------------------------- |
+| `key`    | Required | Setting name to reset (`model` or `key`) |
 
 **Examples:**
 
 ```bash
-# Reset the model to its default
+# Reset model to default
 moves settings unset model
 
-# Clear the stored API key
+# Clear stored API key
 moves settings unset key
 ```
 
----
+**Behavior:**
+- Reads default value from system template
+- Overwrites user configuration with default
+- For `key`, removes the stored API key entirely
 
 ## Common Workflows
 
-### Complete Workflow from Scratch
+### Complete Setup from Scratch
 
 ```bash
-# 1. Configure your model and API key
+# 1. Configure LLM model and API key
 moves settings set model openai/gpt-4o-mini
 moves settings set key sk-your-api-key-here
 
-# 2. Add a new speaker profile
+# 2. Create speaker profile
 moves speaker add "Conference Speaker" ./keynote.pdf ./speech_notes.pdf
 
-# 3. Process the speaker's data for AI control
+# 3. Process speaker data
 moves speaker process "Conference Speaker"
 
-# 4. Start the presentation
+# 4. Launch presentation control
 moves presentation control "Conference Speaker"
 ```
 
 ### Managing Multiple Speakers
 
 ```bash
-# Add multiple speakers
+# Add multiple speaker profiles
 moves speaker add "Speaker A" ./presentation_A.pdf ./transcript_A.pdf
 moves speaker add "Speaker B" ./presentation_B.pdf ./transcript_B.pdf
 
-# List all speakers to verify
+# View all speakers
 moves speaker list
 
-# Process all speakers at once
+# Process all speakers simultaneously
 moves speaker process --all
 
-# Show details for a specific speaker
+# View detailed information for specific speaker
 moves speaker show "Speaker A"
+
+# Control presentation for specific speaker
+moves presentation control "Speaker A"
+```
+
+### Updating Existing Speaker Data
+
+```bash
+# Update presentation file
+moves speaker edit "John Doe" --presentation ./updated_slides.pdf
+
+# Update both files
+moves speaker edit "John Doe" -p ./new_slides.pdf -t ./new_transcript.pdf
+
+# Re-process after updates
+moves speaker process "John Doe"
 ```
 
 ### Troubleshooting
 
 ```bash
-# Check your current model and key configuration
+# Verify current configuration
 moves settings list
 
-# Verify a speaker's status and file paths
+# Check speaker profile details
 moves speaker show "Your Speaker Name"
 
-# Re-process the speaker if data seems out of sync
+# Re-process if data appears out of sync
 moves speaker process "Your Speaker Name"
+
+# Switch to different LLM model
+moves settings set model gemini/gemini-2.0-flash
+moves settings set key YOUR_GEMINI_API_KEY
+moves speaker process --all
+```
+
+### Working with Speaker IDs
+
+When multiple speakers share the same name, use unique IDs for precise identification:
+
+```bash
+# List shows both name and ID
+moves speaker list
+# Output:
+#   1. John Doe (john-doe-a1b2c)
+#   2. John Doe (john-doe-x7y8z)
+
+# Use ID for specific operations
+moves speaker show john-doe-a1b2c
+moves speaker process john-doe-x7y8z
+moves presentation control john-doe-a1b2c
 ```
