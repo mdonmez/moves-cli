@@ -1,14 +1,14 @@
 # moves CLI Reference
 
-The `moves` command-line interface provides a comprehensive toolset for managing and controlling your presentations directly from the terminal. This guide details all commands, options, and common workflows.
+The `moves` command-line interface is your primary tool for managing and controlling presentations. It offers a comprehensive suite of commands to handle everything from initial setup to live, voice-driven presentation delivery. This guide provides a detailed reference for all available commands, options, and common workflows.
 
 ## Get Started
 
-Get up and running with `moves` in three steps.
+Get up and running with `moves` in three simple steps.
 
 ### 1. Configure Your AI Model
 
-First, configure the AI model and API key.
+First, configure the AI model and API key. `moves` relies on a Large Language Model (LLM) to analyze your presentation and transcript, so this step is essential for the core functionality.
 
 > **Note:** Find compatible models at [LiteLLM Supported Models](https://models.litellm.ai/).
 
@@ -22,7 +22,7 @@ moves settings set key YOUR_API_KEY
 
 ### 2. Add and Process a Speaker
 
-Next, add a speaker profile using their presentation and transcript files. Both files must be in PDF format.
+Next, add a speaker profile with their presentation and transcript. **Both files must be in PDF format.** `moves` will use these files to understand the content and structure of the presentation.
 
 ```bash
 # Add a speaker with their presentation and transcript
@@ -32,21 +32,23 @@ moves speaker add "Speaker Name" ./presentation.pdf ./transcript.pdf
 moves speaker process "Speaker Name"
 ```
 
+Processing involves using the configured AI model to analyze the presentation and transcript, dividing them into logical sections that can be navigated during the live presentation.
+
 ### 3. Start the Presentation
 
-Finally, launch the presentation control session.
+With the speaker processed, you can now launch the live presentation control session.
 
 ```bash
 moves presentation control "Speaker Name"
 ```
 
-Focus the presentation window, and `moves` will handle the slide transitions as you speak.
+Once the session starts, focus the presentation window. `moves` will listen to your voice and automatically advance the slides as you speak, matching your words to the content of the presentation.
 
 ---
 
 ## Command Structure
 
-All `moves` commands follow a consistent structure:
+All `moves` commands follow a consistent and predictable structure:
 
 ```
 moves [GLOBAL_OPTIONS] <SUBCOMMAND> <ACTION> [ARGUMENTS] [OPTIONS]
@@ -60,14 +62,14 @@ moves [GLOBAL_OPTIONS] <SUBCOMMAND> <ACTION> [ARGUMENTS] [OPTIONS]
 
 **Global Options:**
 
-- `--help`: Show help information for a command.
+- `--help`: Show help information for any command.
 - `--version`: Display the application's version.
 
 ---
 
 ## `speaker` Subcommand
 
-Manages speaker profiles, their associated files, and AI processing.
+The `speaker` subcommand is used to manage speaker profiles, their associated files, and the AI processing required for live presentation control.
 
 | Action    | Description                                     |
 | :-------- | :---------------------------------------------- |
@@ -80,7 +82,7 @@ Manages speaker profiles, their associated files, and AI processing.
 
 ### `add`
 
-Creates a new speaker profile.
+Creates a new speaker profile, linking a name to a presentation and transcript file.
 
 **Usage:**
 
@@ -104,7 +106,7 @@ moves speaker add "John Doe" ./presentation.pdf ./transcript.pdf
 
 ### `edit`
 
-Updates the presentation or transcript file path for a speaker.
+Updates the presentation or transcript file path for an existing speaker.
 
 **Usage:**
 
@@ -140,7 +142,7 @@ moves speaker edit "John Doe" -p ./new_slides.pdf -t ./new_speech.pdf
 
 ### `list`
 
-Displays all registered speakers.
+Displays a list of all registered speakers and their processing status.
 
 **Usage:**
 
@@ -150,7 +152,7 @@ moves speaker list
 
 ### `show`
 
-Provides detailed information about a specific speaker.
+Provides detailed information about a specific speaker, including their ID, file paths, and processing status.
 
 **Usage:**
 
@@ -176,7 +178,7 @@ moves speaker show speaker-123
 
 ### `process`
 
-Processes speaker data using the configured AI model for live control.
+Processes a speaker's data using the configured AI model. This step is crucial for enabling live, voice-controlled navigation. The process involves analyzing the content of the presentation and transcript to create logical sections that `moves` can navigate between.
 
 **Usage:**
 
@@ -211,7 +213,7 @@ moves speaker process --all
 
 ### `delete`
 
-Removes one or more speakers and their associated data.
+Removes one or more speakers and all their associated data from the system.
 
 **Usage:**
 
@@ -248,11 +250,11 @@ moves speaker delete --all
 
 ## `presentation` Subcommand
 
-Controls the live presentation using voice-activated navigation.
+The `presentation` subcommand is used to control the live presentation, leveraging the processed speaker data for voice-activated navigation.
 
 ### `control`
 
-Starts a live, voice-controlled presentation session.
+Starts a live, voice-controlled presentation session. During the session, `moves` listens to the speaker's voice and automatically advances the slides based on the content of the speech.
 
 **Usage:**
 
@@ -284,7 +286,7 @@ moves presentation control "John Doe"
 
 ## `settings` Subcommand
 
-Configures the LLM model and API key.
+The `settings` subcommand is used to configure the LLM model and API key required for the AI-powered features of `moves`.
 
 | Action  | Description                            |
 | :------ | :------------------------------------- |
@@ -339,7 +341,7 @@ moves settings set key YOUR_API_KEY_HERE
 
 ### `unset`
 
-Resets a setting to its default value or clears it.
+Resets a setting to its default value or clears it entirely.
 
 **Usage:**
 
@@ -369,6 +371,8 @@ moves settings unset key
 
 ### Complete Workflow from Scratch
 
+This workflow demonstrates the end-to-end process of setting up and running a presentation with `moves`.
+
 ```bash
 # 1. Configure your model and API key
 moves settings set model openai/gpt-4o-mini
@@ -386,12 +390,14 @@ moves presentation control "Conference Speaker"
 
 ### Managing Multiple Speakers
 
+This workflow shows how to manage multiple speakers within the `moves` system.
+
 ```bash
 # Add multiple speakers
 moves speaker add "Speaker A" ./presentation_A.pdf ./transcript_A.pdf
 moves speaker add "Speaker B" ./presentation_B.pdf ./transcript_B.pdf
 
-# List all speakers to verify
+# List all speakers to verify they were added
 moves speaker list
 
 # Process all speakers at once
@@ -402,6 +408,8 @@ moves speaker show "Speaker A"
 ```
 
 ### Troubleshooting
+
+If you encounter issues, these commands can help you diagnose the problem.
 
 ```bash
 # Check your current model and key configuration
