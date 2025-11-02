@@ -27,16 +27,29 @@ def generate_chunks(sections: list[Section], window_size: int) -> list[Chunk]:
     return chunks
 
 
-def get_candidate_chunks(
-    current_section: Section, all_chunks: list[Chunk]
-) -> list[Chunk]:
-    idx = current_section.section_index
-    start, end = idx - 2, idx + 3
+class CandidateChunkGenerator:
+    def __init__(self, all_chunks: list[Chunk]):
+        self._index: dict[int, list[Chunk]] = {}
 
-    return [
-        chunk
-        for chunk in all_chunks
-        if len(chunk.source_sections) != 1
-        or chunk.source_sections[0].section_index not in (start, end)
-        if all(start <= s.section_index <= end for s in chunk.source_sections)
-    ]
+        for chunk in all_chunks:
+            if not chunk.source_sections:
+                continue
+
+            min_sec_idx = min(s.section_index for s in chunk.source_sections)
+            max_sec_idx = max(s.section_index for s in chunk.source_sections)
+
+            start_candidate_range = max_sec_idx - 3
+            end_candidate_range = min_sec_idx + 2
+
+            for idx in range(start_candidate_range, end_candidate_range + 1):
+                if len(chunk.source_sections) == 1:
+                    source_idx = chunk.source_sections[0].section_index
+                    if source_idx == idx - 2 or source_idx == idx + 3:
+                        continue
+
+                if idx not in self._index:
+                    self._index[idx] = []
+                self._index[idx].append(chunk)
+
+    def get_candidate_chunks(self, current_section: Section) -> list[Chunk]:
+        return self._index.get(current_section.section_index, [])

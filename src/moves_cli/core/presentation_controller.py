@@ -53,6 +53,10 @@ class PresentationController:
             decoding_method="greedy_search",
         )
 
+        self.candidate_chunk_generator = chunk_producer.CandidateChunkGenerator(
+            all_chunks=self.chunks
+        )
+
         self.stream = self.recognizer.create_stream()
 
         self.recent_words: deque[str] = deque(maxlen=window_size)
@@ -119,8 +123,10 @@ class PresentationController:
                     self.navigator_working = True
 
                     try:
-                        candidate_chunks = chunk_producer.get_candidate_chunks(
-                            self.current_section, self.chunks
+                        candidate_chunks = (
+                            self.candidate_chunk_generator.get_candidate_chunks(
+                                self.current_section
+                            )
                         )
 
                         if not candidate_chunks:
