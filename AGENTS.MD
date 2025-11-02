@@ -82,6 +82,15 @@ Local ONNX models bundled at build time:
 
 Downloaded to `~/.moves/ml_models/` on first use via `model_downloader.download_model()`.
 
+**Auto-Cleanup (Deep):** The system performs comprehensive cleanup during model downloads:
+
+- Removes outdated model folders entirely
+- Removes old files inside current model folders (e.g., from version upgrades)
+- Removes stray files in ml_models root directory
+- Preserves ONLY the exact file structure defined in MODELS config
+
+⚠️ **Important:** Do not manually add files to `~/.moves/ml_models/` - they will be deleted automatically. This folder is managed exclusively by the model downloader.
+
 ## Testing Strategy
 
 ### Mock System Dependencies

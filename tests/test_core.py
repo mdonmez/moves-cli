@@ -73,8 +73,8 @@ def mock_recognizer():
     """Mock the OnlineRecognizer."""
     with patch("moves_cli.core.presentation_controller.OnlineRecognizer") as mock:
         mock_instance = MagicMock()
-        mock_stream = MagicMock()
-        mock_instance.create_stream.return_value = mock_stream
+        # Make create_stream return a new mock each time it's called
+        mock_instance.create_stream.side_effect = lambda: MagicMock()
         mock.from_transducer.return_value = mock_instance
         yield mock
 
@@ -257,7 +257,7 @@ class TestPresentationController:
 
         assert controller.sections == sample_sections
         assert controller.current_section == start_section
-        assert controller.window_size == 12
+        assert controller.window_size == 8
 
     def test_custom_window_size(
         self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
@@ -287,3 +287,99 @@ class TestPresentationController:
 
         # Verify controller was initialized without errors
         assert controller.frame_duration == 0.1
+
+    def test_pause_clears_audio_queue(
+        self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
+    ):
+        """Test that pausing clears the audio queue."""
+        controller = PresentationController(sample_sections, sample_sections[0])
+
+        # Add some data to the audio queue
+        import numpy as np
+
+        controller.audio_queue.append(np.array([1.0, 2.0, 3.0]))
+        controller.audio_queue.append(np.array([4.0, 5.0, 6.0]))
+
+        assert len(controller.audio_queue) == 2
+
+        # Pause should clear the queue
+        controller._toggle_pause()
+
+        assert controller.paused is True
+        assert len(controller.audio_queue) == 0
+
+    def test_resume_resets_stream_and_word_buffers(
+        self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
+    ):
+        """Test that resuming resets STT stream and clears word buffers."""
+        controller = PresentationController(sample_sections, sample_sections[0])
+
+        # Add some data to word buffers
+        controller.recent_words.extend(["hello", "world", "test"])
+        controller.previous_recent_words = ["previous", "words"]
+
+        # Store the initial stream
+        initial_stream = controller.stream
+
+        # Pause first
+        controller._toggle_pause()
+        assert controller.paused is True
+
+        # Resume should reset stream and clear word buffers
+        controller._toggle_pause()
+
+        assert controller.paused is False
+        assert len(controller.recent_words) == 0
+        assert controller.previous_recent_words == []
+        # Stream should be a new instance after resume
+        assert controller.stream != initial_stream
+
+    def test_audio_callback_respects_pause(
+        self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
+    ):
+        """Test that audio callback doesn't add data when paused."""
+        controller = PresentationController(sample_sections, sample_sections[0])
+
+        import numpy as np
+
+        test_audio = np.array([[1.0], [2.0], [3.0], [4.0], [5.0]])
+
+        # Add audio when not paused
+        controller._audio_callback(test_audio, None, None, None)
+        assert len(controller.audio_queue) == 1
+
+        # Pause and try to add more audio
+        controller._toggle_pause()
+        controller._audio_callback(test_audio, None, None, None)
+
+        # Queue should still be empty (cleared on pause)
+        assert len(controller.audio_queue) == 0
+
+        # Resume and add audio again
+        controller._toggle_pause()
+        controller._audio_callback(test_audio, None, None, None)
+        assert len(controller.audio_queue) == 1
+
+    def test_process_audio_skips_when_paused(
+        self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
+    ):
+        """Test that process_audio skips processing when paused."""
+        controller = PresentationController(sample_sections, sample_sections[0])
+
+        import numpy as np
+
+        controller.audio_queue.append(np.array([1.0, 2.0, 3.0]))
+
+        # Pause the controller
+        controller.paused = True
+
+        # Set shutdown flag to exit after one iteration
+        controller.shutdown_flag.set()
+
+        # Process audio should not process the queue when paused
+        controller.process_audio()
+
+        # Queue should still have data (wasn't processed)
+        assert len(controller.audio_queue) == 1
+        # Stream should not have been called with waveform
+        assert not controller.stream.accept_waveform.called

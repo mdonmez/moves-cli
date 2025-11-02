@@ -1,10 +1,8 @@
 from dataclasses import dataclass
-from typing import Literal
 from pathlib import Path
 
 
 SpeakerId = str
-HistoryId = str
 
 
 @dataclass(frozen=True)
@@ -42,5 +40,6 @@ class Settings:
 @dataclass(frozen=True)
 class ProcessResult:
     section_count: int
-    transcript_from: Literal["SOURCE", "LOCAL"]
-    presentation_from: Literal["SOURCE", "LOCAL"]
+    chunk_count: int
+    speaker_id: SpeakerId
+    processing_time_seconds: float

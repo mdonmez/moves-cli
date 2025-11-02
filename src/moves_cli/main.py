@@ -11,14 +11,16 @@ def speaker_manager_instance():
     return SpeakerManager()
 
 
-def presentation_controller_instance(sections: list[Section], start_section: Section):
+def presentation_controller_instance(
+    sections: list[Section], start_section: Section, window_size: int
+):
     typer.echo("Loading speech recognition models (this may take a while)...")
     from moves_cli.core.presentation_controller import PresentationController
 
     controller = PresentationController(
         sections=sections,
         start_section=start_section,
-        window_size=12,
+        window_size=window_size,
     )
     return controller
 
@@ -62,14 +64,14 @@ def speaker_add(
 ):
     """Create a new speaker profile with presentation and transcript files"""
     # Validate file paths exist
-    if not source_presentation.exists():
+    if not source_presentation.exists() or not source_transcript.exists():
         typer.echo(f"Could not add speaker '{name}'.", err=True)
-        typer.echo(f"    Presentation file not found: {source_presentation}", err=True)
-        raise typer.Exit(1)
-
-    if not source_transcript.exists():
-        typer.echo(f"Could not add speaker '{name}'.", err=True)
-        typer.echo(f"    Transcript file not found: {source_transcript}", err=True)
+        if not source_presentation.exists():
+            typer.echo(
+                f"    Presentation file not found: {source_presentation}", err=True
+            )
+        if not source_transcript.exists():
+            typer.echo(f"    Transcript file not found: {source_transcript}", err=True)
         raise typer.Exit(1)
 
     try:
@@ -83,6 +85,8 @@ def speaker_add(
         typer.echo(f"    Presentation -> {speaker.source_presentation}")
         typer.echo(f"    Transcript -> {speaker.source_transcript}")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Could not add speaker '{name}'.", err=True)
         typer.echo(f"    {str(e)}", err=True)
@@ -118,14 +122,20 @@ def speaker_edit(
         transcript_path = Path(source_transcript) if source_transcript else None
 
         if presentation_path and not presentation_path.exists():
-            typer.echo(f"Could not update speaker '{resolved_speaker.name}'.", err=True)
+            typer.echo(
+                f"Could not update speaker '{resolved_speaker.name}' ({resolved_speaker.speaker_id}).",
+                err=True,
+            )
             typer.echo(
                 f"    Presentation file not found: {presentation_path}", err=True
             )
             raise typer.Exit(1)
 
         if transcript_path and not transcript_path.exists():
-            typer.echo(f"Could not update speaker '{resolved_speaker.name}'.", err=True)
+            typer.echo(
+                f"Could not update speaker '{resolved_speaker.name}' ({resolved_speaker.speaker_id}).",
+                err=True,
+            )
             typer.echo(f"    Transcript file not found: {transcript_path}", err=True)
             raise typer.Exit(1)
 
@@ -141,6 +151,8 @@ def speaker_edit(
         if transcript_path:
             typer.echo(f"    Transcript -> {updated_speaker.source_transcript}")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Error: {str(e)}", err=True)
         raise typer.Exit(1)
@@ -178,6 +190,8 @@ def speaker_list():
                 f"{speaker.speaker_id:<{id_width}} {speaker.name:<{name_width}} {ready_status}"
             )
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Error accessing speaker data: {str(e)}", err=True)
         raise typer.Exit(1)
@@ -209,6 +223,8 @@ def speaker_show(
         typer.echo(f"    Presentation -> {resolved_speaker.source_presentation}")
         typer.echo(f"    Transcript -> {resolved_speaker.source_transcript}")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Error: {str(e)}", err=True)
         raise typer.Exit(1)
@@ -280,15 +296,27 @@ def speaker_process(
             result = results[0]
             speaker = speaker_list[0]
             typer.echo(f"Speaker '{speaker.name}' ({speaker.speaker_id}) processed.")
-            typer.echo(f"    {result.section_count} sections created.")
+            typer.echo(
+                f"{result.section_count} sections have been created and will be split into {result.chunk_count} chunks for control."
+            )
+            typer.echo(
+                f"The processing time took {result.processing_time_seconds:.1f} seconds."
+            )
         else:
             typer.echo(f"{len(speaker_list)} speakers processed.")
+
+            # Display detailed results for all speakers
+            total_time = sum(result.processing_time_seconds for result in results)
             for i, result in enumerate(results):
                 speaker = speaker_list[i]
                 typer.echo(
-                    f"    '{speaker.name}' ({speaker.speaker_id}) -> {result.section_count} sections created."
+                    f"'{speaker.name}' ({speaker.speaker_id}) -> {result.section_count} sections & {result.chunk_count} chunks ({result.processing_time_seconds:.1f}s)"
                 )
 
+            typer.echo(f"The processing time took {total_time:.1f} seconds for total.")
+
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Processing error: {str(e)}", err=True)
         raise typer.Exit(1)
@@ -346,6 +374,8 @@ def speaker_delete(
         if failed_count > 0:
             raise typer.Exit(1)
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Error: {str(e)}", err=True)
         raise typer.Exit(1)
@@ -374,11 +404,11 @@ def presentation_control(
 
         if not sections_file.exists():
             typer.echo(
-                f"Error: Speaker '{resolved_speaker.name}' has not been processed yet.",
+                f"Error: Speaker '{resolved_speaker.name}' ({resolved_speaker.speaker_id}) has not been processed yet.",
                 err=True,
             )
             typer.echo(
-                "Please run 'moves speaker process' first to generate sections.",
+                f"Please run 'moves speaker process {resolved_speaker.speaker_id}' first to generate sections.",
                 err=True,
             )
             raise typer.Exit(1)
@@ -394,7 +424,11 @@ def presentation_control(
         # Determine starting section (first section)
         start_section = sections[0]
 
-        controller = presentation_controller_instance(sections, start_section)
+        window_size = 12
+
+        controller = presentation_controller_instance(
+            sections, start_section, window_size=window_size
+        )
 
         typer.echo(
             f"Starting presentation control for '{resolved_speaker.name}' ({resolved_speaker.speaker_id})."
@@ -406,12 +440,16 @@ def presentation_control(
         typer.echo("      → (Right Arrow): Next section")
         typer.echo("      ← (Left Arrow): Previous section")
         typer.echo("      Ins (Insert): Pause/Resume automatic navigation")
-        typer.echo("    \nWaiting for 12 words to first trigger, keep speaking...\n")
+        typer.echo(
+            f"    \nWaiting for {window_size} words to first trigger, keep speaking...\n"
+        )
 
         controller.control()
 
         typer.echo("\nControl session ended.\n")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Presentation control error: {str(e)}", err=True)
         raise typer.Exit(1)
@@ -438,6 +476,8 @@ def settings_list():
         else:
             typer.echo("    key (API Key) -> Not configured")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Error accessing settings: {str(e)}", err=True)
         raise typer.Exit(1)
@@ -471,6 +511,8 @@ def settings_set(
             typer.echo(f"Could not update setting '{key}'.", err=True)
             raise typer.Exit(1)
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Unexpected error: {str(e)}", err=True)
         raise typer.Exit(1)
@@ -514,6 +556,8 @@ def settings_unset(
             typer.echo(f"Could not reset setting '{key}'.", err=True)
             raise typer.Exit(1)
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"Unexpected error: {str(e)}", err=True)
         raise typer.Exit(1)

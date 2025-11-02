@@ -277,7 +277,7 @@ moves presentation control "John Doe"
 - **Voice**: Speak naturally to trigger automatic slide navigation.
 - **→ (Right Arrow)**: Manually advance to the next section.
 - **← (Left Arrow)**: Manually return to the previous section.
-- **Ins (Insert)**: Pause or resume automatic voice navigation.
+- **Ins (Insert)**: Pause or resume automatic voice navigation. When paused, the microphone is muted, audio buffers are cleared, and navigation is halted. When resumed, the STT stream and word buffers are reset for a clean state.
 - **Ctrl+C**: Exit the control session.
 
 ---

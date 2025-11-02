@@ -11,31 +11,6 @@ class SimilarityCalculator:
         self.semantic = Semantic()
         self.phonetic = Phonetic()
 
-    def _normalize_scores(self, results: list[SimilarityResult]) -> dict[int, float]:
-        if not results:
-            return {}
-
-        valid_scores = [res.score for res in results if res.score >= 0.5]
-        if not valid_scores:
-            return {id(res.chunk): 0.0 for res in results}
-
-        min_val = min(valid_scores)
-        max_val = max(valid_scores)
-
-        if max_val == min_val:
-            return {id(res.chunk): 1.0 if res.score >= 0.5 else 0.0 for res in results}
-
-        score_range = max_val - min_val
-
-        normalized = {}
-        for res in results:
-            if res.score >= 0.5:
-                normalized[id(res.chunk)] = (res.score - min_val) / score_range
-            else:
-                normalized[id(res.chunk)] = 0.0
-
-        return normalized
-
     def compare(
         self, input_str: str, candidates: list[Chunk]
     ) -> list[SimilarityResult]:
@@ -46,18 +21,25 @@ class SimilarityCalculator:
             semantic_results = self.semantic.compare(input_str, candidates)
             phonetic_results = self.phonetic.compare(input_str, candidates)
 
-            semantic_norm = self._normalize_scores(semantic_results)
-            phonetic_norm = self._normalize_scores(phonetic_results)
+            phonetic_scores = {id(res.chunk): res.score for res in phonetic_results}
+            semantic_scores = {id(res.chunk): res.score for res in semantic_results}
+
+            max_p = max(phonetic_scores.values())
+            max_s = max(semantic_scores.values())
+
+            batch_quality = (self.phonetic_weight * max_p) + (
+                self.semantic_weight * max_s
+            )
 
             final_results = []
             for candidate in candidates:
-                candidate_id = id(candidate)
-                sem_score = semantic_norm.get(candidate_id, 0.0)
-                pho_score = phonetic_norm.get(candidate_id, 0.0)
-
-                weighted_score = (
-                    self.semantic_weight * sem_score + self.phonetic_weight * pho_score
+                cid = id(candidate)
+                norm_p = phonetic_scores[cid] / max_p
+                norm_s = semantic_scores[cid] / max_s
+                relative = (self.phonetic_weight * norm_p) + (
+                    self.semantic_weight * norm_s
                 )
+                weighted_score = relative * batch_quality
 
                 final_results.append(
                     SimilarityResult(chunk=candidate, score=weighted_score)

@@ -21,6 +21,7 @@ dependencies = [
     "sounddevice>=0.5.2",
     "tomlkit>=0.13.3",
     "typer>=0.19.2",
+    "unidecode>=1.4.0",
 ]
 
 [project.scripts]

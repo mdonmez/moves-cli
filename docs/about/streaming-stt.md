@@ -26,3 +26,31 @@ To ensure that audio capture, STT processing, and presentation navigation do not
 4.  **Text Normalization and Consumption (Navigator Thread):**
     - The raw text from the STT engine is immediately normalized using the `text_normalizer` utility. This critical step ensures the transcribed text has the same canonical format (lowercase, numbers as words, no punctuation) as the pre-processed `Chunk` data.
     - The most recent 12 normalized words are maintained in a separate "recent words" `deque`. This sliding window of the speaker's most recent utterance is then passed to the `SimilarityCalculator` for analysis by the navigator thread, completing the pipeline from sound to action.
+
+## Pause and Resume Controls
+
+The presentation controller includes a pause/resume mechanism triggered by the Insert key. This feature provides complete isolation from audio input when paused, ensuring clean state when resuming.
+
+### Pause Behavior
+
+When the Insert key is pressed to pause:
+
+1. **Audio Queue Clearing:** All buffered audio frames in the `audio_queue` deque are immediately discarded. This prevents any unprocessed audio captured before the pause from being processed later.
+
+2. **Microphone Muting:** The audio callback (`_audio_callback`) checks the `paused` state before appending new audio frames to the queue. While paused, incoming audio is dropped at the source, effectively muting the microphone input.
+
+3. **Processing Suspension:** The `process_audio` thread checks the pause state and skips all STT processing while paused, providing a defensive layer of protection.
+
+4. **Navigation Blocking:** The navigator thread respects the pause state and halts all similarity matching and slide navigation operations.
+
+### Resume Behavior
+
+When the Insert key is pressed again to resume:
+
+1. **Stream Reset:** A fresh STT stream is created by calling `self.stream = self.recognizer.create_stream()`. This clears all internal recognition context from sherpa-onnx, preventing any carryover effects from speech recognized before the pause.
+
+2. **Word Buffer Clearing:** Both `recent_words` and `previous_recent_words` are emptied to ensure no stale speech recognition data can trigger navigation actions.
+
+3. **Clean Slate:** With the audio queue already cleared, a new stream created, and word buffers reset, the system resumes in a completely fresh state, as if the presentation just started.
+
+This comprehensive reset mechanism ensures that pausing doesn't introduce artifacts or false matches when the presentation resumes.

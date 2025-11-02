@@ -122,11 +122,11 @@ class TestChunkProducer:
         assert chunks == []
 
     def test_default_window_size(self, sample_sections):
-        """Test default window size of 12."""
+        """Test default window size of 8."""
         chunks = chunk_producer.generate_chunks(sample_sections)
 
         for chunk in chunks:
-            assert len(chunk.partial_content.split()) == 12
+            assert len(chunk.partial_content.split()) == 8
 
 
 # ============================================================================

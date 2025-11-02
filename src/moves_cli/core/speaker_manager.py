@@ -82,30 +82,55 @@ class SpeakerManager:
     def process(
         self, speakers: list[Speaker], llm_model: str, llm_api_key: str
     ) -> list[ProcessResult]:
-        # Lazy import - only load when processing is actually needed
-        from moves_cli.core.components import section_producer
-
         async def run():
             speaker_paths = [
                 self.SPEAKERS_PATH / speaker.speaker_id for speaker in speakers
             ]
 
+            # Validate all speakers' files upfront before starting async processing
             for speaker, speaker_path in zip(speakers, speaker_paths):
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
                 local_presentation = speaker_path / "presentation.pdf"
                 local_transcript = speaker_path / "transcript.pdf"
-                if not (
-                    (source_presentation.exists() and source_transcript.exists())
-                    or (local_presentation.exists() and local_transcript.exists())
-                ):
+
+                # Determine file sources
+                presentation_from = None
+                transcript_from = None
+
+                # Check presentation file
+                if source_presentation.exists():
+                    presentation_from = "SOURCE"
+                elif local_presentation.exists():
+                    presentation_from = "LOCAL"
+                else:
                     raise FileNotFoundError(
-                        f"Missing files for speaker {speaker.name} ({speaker.speaker_id})"
+                        f"Missing presentation file for speaker '{speaker.name}' ({speaker.speaker_id})"
                     )
 
-            async def process_speaker(speaker, speaker_path, delay):
-                await asyncio.sleep(delay)
+                # Check transcript file
+                if source_transcript.exists():
+                    transcript_from = "SOURCE"
+                elif local_transcript.exists():
+                    transcript_from = "LOCAL"
+                else:
+                    raise FileNotFoundError(
+                        f"Missing transcript file for speaker '{speaker.name}' ({speaker.speaker_id})"
+                    )
 
+                # Print file sources for the speaker
+                file_sources = (
+                    f"{presentation_from} presentation & {transcript_from} transcript"
+                )
+                if len(speakers) == 1:
+                    print(f"Using {file_sources}.")
+                else:
+                    print(f"'{speaker.name}' ({speaker.speaker_id}) -> {file_sources}")
+
+            async def process_speaker(speaker, speaker_path, delay):
+                import time
+
+                # File location checking and moving operations at the top
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
 
@@ -113,8 +138,8 @@ class SpeakerManager:
                 local_transcript = speaker_path / "transcript.pdf"
 
                 presentation_path, transcript_path = None, None
-                transcript_from, presentation_from = None, None
 
+                # Handle presentation file
                 if source_presentation.exists():
                     data_handler.copy(source_presentation, speaker_path)
                     if source_presentation.name != "presentation.pdf":
@@ -123,15 +148,14 @@ class SpeakerManager:
                         ).relative_to(data_handler.DATA_FOLDER)
                         data_handler.rename(relative_file_path, "presentation.pdf")
                     presentation_path = speaker_path / "presentation.pdf"
-                    presentation_from = "SOURCE"
                 elif local_presentation.exists():
                     presentation_path = local_presentation
-                    presentation_from = "LOCAL"
                 else:
                     raise FileNotFoundError(
-                        f"Missing presentation file for speaker {speaker.name}"
+                        f"Missing presentation file for speaker '{speaker.name}' ({speaker.speaker_id})"
                     )
 
+                # Handle transcript file
                 if source_transcript.exists():
                     data_handler.copy(source_transcript, speaker_path)
                     if source_transcript.name != "transcript.pdf":
@@ -140,14 +164,20 @@ class SpeakerManager:
                         ).relative_to(data_handler.DATA_FOLDER)
                         data_handler.rename(relative_file_path, "transcript.pdf")
                     transcript_path = speaker_path / "transcript.pdf"
-                    transcript_from = "SOURCE"
                 elif local_transcript.exists():
                     transcript_path = local_transcript
-                    transcript_from = "LOCAL"
                 else:
                     raise FileNotFoundError(
-                        f"Missing transcript file for speaker {speaker.name}"
+                        f"Missing transcript file for speaker '{speaker.name}' ({speaker.speaker_id})"
                     )
+
+                # Apply staggered delay before LLM API calls to avoid rate limiting
+                await asyncio.sleep(delay)
+
+                # Lazy import - only load when processing is actually needed (after file validation)
+                from moves_cli.core.components import section_producer, chunk_producer
+
+                start_time = time.perf_counter()
 
                 sections = await asyncio.to_thread(
                     section_producer.generate_sections,
@@ -162,10 +192,16 @@ class SpeakerManager:
                     json.dumps(section_producer.convert_to_list(sections), indent=2),
                 )
 
+                # Generate chunks to get chunk count
+                chunks = chunk_producer.generate_chunks(sections, window_size=12)
+
+                processing_time = time.perf_counter() - start_time
+
                 return ProcessResult(
                     section_count=len(sections),
-                    transcript_from=transcript_from,
-                    presentation_from=presentation_from,
+                    chunk_count=len(chunks),
+                    speaker_id=speaker.speaker_id,
+                    processing_time_seconds=processing_time,
                 )
 
             tasks = [

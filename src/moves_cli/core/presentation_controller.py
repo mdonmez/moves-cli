@@ -20,11 +20,13 @@ class PresentationController:
         self,
         sections: list[Section],
         start_section: Section,
-        window_size: int = 12,
+        window_size: int,
+        similarity_threshold: float = 0.65,
     ):
         self.frame_duration = 0.1
         self.sample_rate = 16000
         self.window_size = window_size
+        self.similarity_threshold = similarity_threshold
 
         model_downloader.download_model("embedding")
         model_downloader.download_model("stt")
@@ -66,12 +68,16 @@ class PresentationController:
 
         self.keyboard_listener = Listener(on_press=self._on_key_press)
 
-        # Always use the default sounddevice input
         self.selected_mic = sd.default.device[0]
 
     def process_audio(self):
         while not self.shutdown_flag.is_set():
             try:
+                # Skip processing if paused (defensive measure)
+                if self.paused:
+                    self.shutdown_flag.wait(0.001)
+                    continue
+
                 if self.audio_queue:
                     chunk = self.audio_queue.popleft()
                 else:
@@ -102,7 +108,6 @@ class PresentationController:
                     self.shutdown_flag.wait(0.001)
                     continue
 
-                # Skip automatic navigation when paused
                 if self.paused:
                     self.shutdown_flag.wait(0.001)
                     continue
@@ -127,6 +132,18 @@ class PresentationController:
                         )
 
                         best_result = similarity_results[0]
+                        best_score = best_result.score
+
+                        # Check if best match meets threshold
+                        if best_score < self.similarity_threshold:
+                            recent_speech = " ".join(current_words[-7:])
+                            print(
+                                f"\n[Ignored - Low confidence: {best_score:.3f} < {self.similarity_threshold}]"
+                            )
+                            print(f"Speech  -> {recent_speech}")
+                            self.previous_recent_words = current_words.copy()
+                            continue
+
                         best_chunk = best_result.chunk
 
                         target_section = best_chunk.source_sections[-1]
@@ -155,6 +172,7 @@ class PresentationController:
                         print(
                             f"\n[{target_section.section_index + 1}/{len(self.sections)}]"
                         )
+                        print(f"Score   -> {best_score:.3f}")
                         print(f"Speech  -> {recent_speech}")
                         print(f"Match   -> {recent_match}")
 
@@ -202,9 +220,21 @@ class PresentationController:
     def _toggle_pause(self):
         self.paused = not self.paused
         if self.paused:
+            # Clear audio queue to discard buffered audio
+            self.audio_queue.clear()
             print("\n[Paused]")
         else:
+            # Reset STT stream to clear internal context
+            self.stream = self.recognizer.create_stream()
+            # Clear word buffers to prevent stale matches
+            self.recent_words.clear()
+            self.previous_recent_words = []
             print("\n[Resumed]")
+
+    def _audio_callback(self, indata, frames, time_info, status):
+        """Audio input callback that respects pause state."""
+        if not self.paused:
+            self.audio_queue.append(indata[:, 0].copy())
 
     def control(self):
         audio_thread = threading.Thread(target=self.process_audio, daemon=True)
@@ -220,9 +250,7 @@ class PresentationController:
                 blocksize=blocksize,
                 dtype="float32",
                 channels=1,
-                callback=lambda indata, *_: self.audio_queue.append(
-                    indata[:, 0].copy()
-                ),
+                callback=self._audio_callback,
                 latency="low",
                 device=self.selected_mic,
             ):

@@ -226,3 +226,228 @@ class TestModelDownloader:
             # Should have called stream for each file in the STT model
             expected_files = model_downloader.MODELS["stt"]["files"]
             assert mock_client.stream.call_count == len(expected_files)
+
+    def test_cleanup_removes_unknown_folders(self, tmp_path, monkeypatch):
+        """Test cleanup deletes entire folders not in MODELS."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+
+        # Create current model folders
+        (ml_models / "all-MiniLM-L6-v2_quint8_avx2").mkdir()
+        (ml_models / "nemo-streaming-stt-480ms-int8").mkdir()
+
+        # Create old model folder
+        old_model = ml_models / "old-model-v1"
+        old_model.mkdir()
+        (old_model / "old_file.onnx").write_text("old")
+
+        result = model_downloader.cleanup_old_models()
+
+        assert result["deleted_folders"] == 1
+        assert not old_model.exists()
+        assert (ml_models / "all-MiniLM-L6-v2_quint8_avx2").exists()
+        assert (ml_models / "nemo-streaming-stt-480ms-int8").exists()
+
+    def test_cleanup_removes_root_level_files(self, tmp_path, monkeypatch):
+        """Test cleanup deletes stray files in ml_models root."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+
+        # Create stray files in root
+        (ml_models / "temp.txt").write_text("temp")
+        (ml_models / ".DS_Store").write_text("system")
+
+        result = model_downloader.cleanup_old_models()
+
+        assert result["deleted_files"] == 2
+        assert not (ml_models / "temp.txt").exists()
+        assert not (ml_models / ".DS_Store").exists()
+
+    def test_cleanup_removes_invalid_files_in_valid_folders(
+        self, tmp_path, monkeypatch
+    ):
+        """Test cleanup deletes old files inside current model folders."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+
+        # Create valid model folder with mix of valid and invalid files
+        model_dir = ml_models / "all-MiniLM-L6-v2_quint8_avx2"
+        model_dir.mkdir()
+        (model_dir / "model.onnx").write_text("valid")  # Valid file
+        (model_dir / "config.json").write_text("valid")  # Valid file
+        (model_dir / "old_model.onnx").write_text("old")  # Invalid file
+        (model_dir / "backup.json").write_text("old")  # Invalid file
+
+        result = model_downloader.cleanup_old_models()
+
+        assert result["deleted_files"] == 2
+        assert (model_dir / "model.onnx").exists()
+        assert (model_dir / "config.json").exists()
+        assert not (model_dir / "old_model.onnx").exists()
+        assert not (model_dir / "backup.json").exists()
+
+    def test_cleanup_removes_nested_folders_in_model_dirs(self, tmp_path, monkeypatch):
+        """Test cleanup deletes unexpected subdirectories in model folders."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+
+        # Create valid model folder with unexpected subdirectory
+        model_dir = ml_models / "nemo-streaming-stt-480ms-int8"
+        model_dir.mkdir()
+        backup_dir = model_dir / "backup"
+        backup_dir.mkdir()
+        (backup_dir / "old_encoder.onnx").write_text("old")
+
+        result = model_downloader.cleanup_old_models()
+
+        assert result["deleted_folders"] == 1
+        assert not backup_dir.exists()
+        assert model_dir.exists()
+
+    def test_cleanup_preserves_valid_structure(self, tmp_path, monkeypatch):
+        """Test cleanup keeps all files defined in MODELS config."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+
+        # Create complete valid structure for embedding model
+        embedding_dir = ml_models / "all-MiniLM-L6-v2_quint8_avx2"
+        embedding_dir.mkdir()
+        for fname in model_downloader.MODELS["embedding"]["files"]:
+            (embedding_dir / fname).write_text("valid")
+
+        # Create complete valid structure for STT model
+        stt_dir = ml_models / "nemo-streaming-stt-480ms-int8"
+        stt_dir.mkdir()
+        for fname in model_downloader.MODELS["stt"]["files"]:
+            (stt_dir / fname).write_text("valid")
+
+        result = model_downloader.cleanup_old_models()
+
+        assert result["deleted_folders"] == 0
+        assert result["deleted_files"] == 0
+        # All files should still exist
+        for fname in model_downloader.MODELS["embedding"]["files"]:
+            assert (embedding_dir / fname).exists()
+        for fname in model_downloader.MODELS["stt"]["files"]:
+            assert (stt_dir / fname).exists()
+
+    def test_cleanup_handles_missing_directory(self, tmp_path, monkeypatch):
+        """Test cleanup handles non-existent ml_models directory."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        result = model_downloader.cleanup_old_models()
+
+        assert result == {"deleted_folders": 0, "deleted_files": 0}
+
+    def test_cleanup_handles_partial_model_folders(self, tmp_path, monkeypatch):
+        """Test cleanup with missing files in valid folders."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+
+        # Create valid folder with only subset of expected files
+        model_dir = ml_models / "all-MiniLM-L6-v2_quint8_avx2"
+        model_dir.mkdir()
+        (model_dir / "model.onnx").write_text("valid")
+        (model_dir / "config.json").write_text("valid")
+        # Missing other expected files
+
+        result = model_downloader.cleanup_old_models()
+
+        # Folder preserved, existing files not deleted
+        assert result["deleted_folders"] == 0
+        assert result["deleted_files"] == 0
+        assert model_dir.exists()
+        assert (model_dir / "model.onnx").exists()
+        assert (model_dir / "config.json").exists()
+
+    def test_cleanup_returns_correct_stats(self, tmp_path, monkeypatch):
+        """Test cleanup returns accurate deletion counts."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+
+        # Create 2 old folders
+        (ml_models / "old-model-1").mkdir()
+        (ml_models / "old-model-2").mkdir()
+
+        # Create 3 stray files in root
+        (ml_models / "file1.txt").write_text("stray")
+        (ml_models / "file2.txt").write_text("stray")
+        (ml_models / "file3.txt").write_text("stray")
+
+        # Create valid folder with 1 invalid file
+        model_dir = ml_models / "all-MiniLM-L6-v2_quint8_avx2"
+        model_dir.mkdir()
+        (model_dir / "old_file.onnx").write_text("old")
+
+        result = model_downloader.cleanup_old_models()
+
+        assert result["deleted_folders"] == 2
+        assert result["deleted_files"] == 4  # 3 in root + 1 in valid folder
+
+    def test_cleanup_handles_permission_errors_gracefully(self, tmp_path, monkeypatch):
+        """Test cleanup raises RuntimeError on permission errors."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+
+        # Create a file in root
+        test_file = ml_models / "test.txt"
+        test_file.write_text("test")
+
+        # Mock unlink to raise PermissionError
+        original_unlink = Path.unlink
+
+        def mock_unlink(self, *args, **kwargs):
+            if self.name == "test.txt":
+                raise PermissionError("Permission denied")
+            return original_unlink(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", mock_unlink)
+
+        with pytest.raises(RuntimeError, match="Cleanup failed"):
+            model_downloader.cleanup_old_models()
+
+    def test_download_model_triggers_cleanup(self, tmp_path, monkeypatch):
+        """Test download_model calls cleanup automatically."""
+        monkeypatch.setattr(data_handler, "DATA_FOLDER", tmp_path)
+
+        # Create ml_models with old folder
+        ml_models = tmp_path / "ml_models"
+        ml_models.mkdir()
+        old_model = ml_models / "old-model"
+        old_model.mkdir()
+
+        with patch(
+            "moves_cli.utils.model_downloader.httpx.Client"
+        ) as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.__enter__ = lambda self: self
+            mock_client.__exit__ = lambda self, *args: None
+            mock_client_class.return_value = mock_client
+
+            mock_response = MagicMock()
+            mock_response.headers.get.return_value = "100"
+            mock_response.iter_bytes.return_value = [b"test"]
+            mock_response.__enter__ = lambda self: self
+            mock_response.__exit__ = lambda self, *args: None
+            mock_client.stream.return_value = mock_response
+
+            model_downloader.download_model("embedding")
+
+            # Old model folder should be cleaned up
+            assert not old_model.exists()
