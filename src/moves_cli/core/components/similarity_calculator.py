@@ -5,11 +5,16 @@ from moves_cli.data.models import Chunk, SimilarityResult
 
 
 class SimilarityCalculator:
-    def __init__(self, semantic_weight: float = 0.6, phonetic_weight: float = 0.4):
+    def __init__(
+        self,
+        all_chunks: list[Chunk],
+        semantic_weight: float = 0.6,
+        phonetic_weight: float = 0.4,
+    ):
         self.semantic_weight = semantic_weight
         self.phonetic_weight = phonetic_weight
-        self.semantic = Semantic()
-        self.phonetic = Phonetic()
+        self.semantic = Semantic(all_chunks)
+        self.phonetic = Phonetic(all_chunks)
 
     def compare(
         self, input_str: str, candidates: list[Chunk]

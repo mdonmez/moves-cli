@@ -253,7 +253,9 @@ class TestPresentationController:
     ):
         """Test basic initialization."""
         start_section = sample_sections[0]
-        controller = PresentationController(sample_sections, start_section)
+        controller = PresentationController(
+            sample_sections, start_section, window_size=8
+        )
 
         assert controller.sections == sample_sections
         assert controller.current_section == start_section
@@ -274,7 +276,9 @@ class TestPresentationController:
     ):
         """Test starting from a different section."""
         start_section = sample_sections[1]
-        controller = PresentationController(sample_sections, start_section)
+        controller = PresentationController(
+            sample_sections, start_section, window_size=8
+        )
 
         assert controller.current_section == start_section
         assert controller.current_section.section_index == 1
@@ -283,7 +287,9 @@ class TestPresentationController:
         self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
     ):
         """Test audio buffer is initialized."""
-        controller = PresentationController(sample_sections, sample_sections[0])
+        controller = PresentationController(
+            sample_sections, sample_sections[0], window_size=8
+        )
 
         # Verify controller was initialized without errors
         assert controller.frame_duration == 0.1
@@ -292,7 +298,9 @@ class TestPresentationController:
         self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
     ):
         """Test that pausing clears the audio queue."""
-        controller = PresentationController(sample_sections, sample_sections[0])
+        controller = PresentationController(
+            sample_sections, sample_sections[0], window_size=8
+        )
 
         # Add some data to the audio queue
         import numpy as np
@@ -312,7 +320,9 @@ class TestPresentationController:
         self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
     ):
         """Test that resuming resets STT stream and clears word buffers."""
-        controller = PresentationController(sample_sections, sample_sections[0])
+        controller = PresentationController(
+            sample_sections, sample_sections[0], window_size=8
+        )
 
         # Add some data to word buffers
         controller.recent_words.extend(["hello", "world", "test"])
@@ -338,7 +348,9 @@ class TestPresentationController:
         self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
     ):
         """Test that audio callback doesn't add data when paused."""
-        controller = PresentationController(sample_sections, sample_sections[0])
+        controller = PresentationController(
+            sample_sections, sample_sections[0], window_size=8
+        )
 
         import numpy as np
 
@@ -364,7 +376,9 @@ class TestPresentationController:
         self, sample_sections, mock_recognizer, mock_sounddevice, mock_keyboard
     ):
         """Test that process_audio skips processing when paused."""
-        controller = PresentationController(sample_sections, sample_sections[0])
+        controller = PresentationController(
+            sample_sections, sample_sections[0], window_size=8
+        )
 
         import numpy as np
 

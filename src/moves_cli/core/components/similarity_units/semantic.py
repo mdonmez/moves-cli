@@ -6,8 +6,10 @@ from moves_cli.data.models import SimilarityResult, Chunk
 
 
 class Semantic:
-    def __init__(self) -> None:
-        self._model = None
+    def __init__(self, all_chunks: list[Chunk]) -> None:
+        from fastembed import TextEmbedding
+
+        self._embeddings: dict[int, np.ndarray] = {}
 
         self._model_path = (
             Path(data_handler.DATA_FOLDER)
@@ -15,30 +17,27 @@ class Semantic:
             / "all-MiniLM-L6-v2_quint8_avx2"
         )
 
-    @property
-    def model(self):
-        """Lazy load the TextEmbedding model only when first accessed."""
-        if self._model is None:
-            from fastembed import TextEmbedding
+        self._model = TextEmbedding(
+            model_name="sentence-transformers/all-MiniLM-l6-v2",
+            specific_model_path=self._model_path,
+        )
 
-            self._model = TextEmbedding(
-                model_name="sentence-transformers/all-MiniLM-l6-v2",
-                specific_model_path=self._model_path,
-            )
-        return self._model
+        if all_chunks:
+            chunk_contents = [chunk.partial_content for chunk in all_chunks]
+            chunk_embeddings = list(self._model.embed(chunk_contents))
+
+            for chunk, embedding in zip(all_chunks, chunk_embeddings):
+                self._embeddings[id(chunk)] = embedding
 
     def compare(
         self, input_str: str, candidates: list[Chunk]
     ) -> list[SimilarityResult]:
         try:
-            embedding_input = [input_str] + [
-                candidate.partial_content for candidate in candidates
+            input_embedding = list(self._model.embed([input_str]))[0]
+
+            candidate_embeddings = [
+                self._embeddings[id(candidate)] for candidate in candidates
             ]
-
-            embeddings = list(self.model.embed(embedding_input))
-
-            input_embedding = embeddings[0]
-            candidate_embeddings = embeddings[1:]
 
             cosine_scores = np.dot(candidate_embeddings, input_embedding)
 

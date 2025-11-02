@@ -123,7 +123,7 @@ class TestChunkProducer:
 
     def test_default_window_size(self, sample_sections):
         """Test default window size of 8."""
-        chunks = chunk_producer.generate_chunks(sample_sections)
+        chunks = chunk_producer.generate_chunks(sample_sections, window_size=8)
 
         for chunk in chunks:
             assert len(chunk.partial_content.split()) == 8
@@ -168,24 +168,26 @@ class TestSectionProducer:
 class TestSimilarityCalculator:
     """Critical tests for similarity calculation."""
 
-    def test_default_weights(self):
+    def test_default_weights(self, sample_chunks):
         """Test default weights (60% semantic, 40% phonetic)."""
-        calculator = SimilarityCalculator()
+        calculator = SimilarityCalculator(all_chunks=sample_chunks)
 
         assert calculator.semantic_weight == 0.6
         assert calculator.phonetic_weight == 0.4
         assert calculator.semantic_weight + calculator.phonetic_weight == 1.0
 
-    def test_custom_weights(self):
+    def test_custom_weights(self, sample_chunks):
         """Test custom weight configuration."""
-        calculator = SimilarityCalculator(semantic_weight=0.7, phonetic_weight=0.3)
+        calculator = SimilarityCalculator(
+            all_chunks=sample_chunks, semantic_weight=0.7, phonetic_weight=0.3
+        )
 
         assert calculator.semantic_weight == 0.7
         assert calculator.phonetic_weight == 0.3
 
     def test_compare_basic(self, sample_chunks):
         """Test basic similarity comparison."""
-        calculator = SimilarityCalculator()
+        calculator = SimilarityCalculator(all_chunks=sample_chunks)
 
         with (
             patch.object(calculator.semantic, "compare") as mock_semantic,
@@ -207,9 +209,13 @@ class TestSimilarityCalculator:
     def test_extreme_weights(self, sample_chunks):
         """Test with extreme weight configurations."""
         # 100% semantic
-        calc1 = SimilarityCalculator(semantic_weight=1.0, phonetic_weight=0.0)
+        calc1 = SimilarityCalculator(
+            all_chunks=sample_chunks, semantic_weight=1.0, phonetic_weight=0.0
+        )
         assert calc1.semantic_weight == 1.0
 
         # 100% phonetic
-        calc2 = SimilarityCalculator(semantic_weight=0.0, phonetic_weight=1.0)
+        calc2 = SimilarityCalculator(
+            all_chunks=sample_chunks, semantic_weight=0.0, phonetic_weight=1.0
+        )
         assert calc2.phonetic_weight == 1.0

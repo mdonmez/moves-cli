@@ -31,11 +31,11 @@ class PresentationController:
         model_downloader.download_model("embedding")
         model_downloader.download_model("stt")
 
-        self.similarity_calculator = SimilarityCalculator()
-
         self.sections = sections
         self.current_section = start_section
         self.chunks = chunk_producer.generate_chunks(sections, window_size)
+
+        self.similarity_calculator = SimilarityCalculator(all_chunks=self.chunks)
 
         self.audio_queue = deque(maxlen=5)
         self.shutdown_flag = threading.Event()

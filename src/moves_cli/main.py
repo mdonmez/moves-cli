@@ -433,7 +433,7 @@ def presentation_control(
         typer.echo(
             f"Starting presentation control for '{resolved_speaker.name}' ({resolved_speaker.speaker_id})."
         )
-        typer.echo(f"    {len(sections)} sections loaded")
+        typer.echo("    Sections loaded and chunks created.")
         typer.echo("    READY & LISTENING\n")
         typer.echo("    Press Ctrl+C to exit.")
         typer.echo("    \nKeyboard controls:")
