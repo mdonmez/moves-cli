@@ -1,18 +1,17 @@
 import threading
 import time
+from contextlib import suppress
 from pathlib import Path
-from queue import Queue, Empty, Full
+from queue import Empty, Full, Queue
 
 import sounddevice as sd
-from pynput.keyboard import Key, Controller, Listener
+from pynput.keyboard import Controller, Key, Listener
 from sherpa_onnx import OnlineRecognizer
 
-from moves_cli.data.models import Section
-from moves_cli.utils import text_normalizer
-from moves_cli.utils import data_handler
-from moves_cli.utils import model_downloader
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
+from moves_cli.data.models import Section
+from moves_cli.utils import data_handler, model_downloader, text_normalizer
 
 
 class PresentationController:
@@ -30,22 +29,29 @@ class PresentationController:
         sections: list[Section],
         window_size: int = 12,
     ):
+        # Core state
         self.window_size = window_size
+        self.sections = sections
+        self.current_section = sections[0]
+        self.paused = False
         self.shutdown_flag = threading.Event()
 
+        # Inter-thread communication
         self.audio_queue = Queue(maxsize=PresentationController.AUDIO_QUEUE_SIZE)
         self.words_queue = Queue(maxsize=PresentationController.WORDS_QUEUE_SIZE)
 
+        # Model downloads
         model_downloader.download_model("embedding")
         model_downloader.download_model("stt")
 
+        # STT model initialization
         try:
             self.recognizer = OnlineRecognizer.from_transducer(
                 tokens=str(self.MODEL_DIR.joinpath("tokens.txt")),
                 encoder=str(self.MODEL_DIR.joinpath("encoder.int8.onnx")),
                 decoder=str(self.MODEL_DIR.joinpath("decoder.int8.onnx")),
                 joiner=str(self.MODEL_DIR.joinpath("joiner.int8.onnx")),
-                num_threads=8,
+                num_threads=self.NUM_THREADS,
                 decoding_method="greedy_search",
             )
         except Exception as e:
@@ -53,16 +59,17 @@ class PresentationController:
                 f"Failed to load STT model from {self.MODEL_DIR}: {e}"
             ) from e
 
-        self.sections = sections
+        # Processing pipeline
         self.chunks = chunk_producer.generate_chunks(sections, window_size)
         self.candidate_chunk_generator = chunk_producer.CandidateChunkGenerator(
             self.chunks
         )
         self.similarity_calculator = SimilarityCalculator(self.chunks)
-        self.paused = False
 
+        # Controllers
         self.keyboard_controller = Controller()
 
+        # Worker threads
         self.stt_processor_thread = threading.Thread(
             target=self._stt_processor_task, daemon=True
         )
@@ -73,12 +80,8 @@ class PresentationController:
 
     def _audio_sampler_callback(self, indata, frames, time, status):
         if not self.audio_queue.full():
-            try:
+            with suppress(Full):
                 self.audio_queue.put_nowait(indata[:, 0].copy())
-            except Full:
-                # This case is rare due to the .full() check but included for safety.
-                pass
-        # If the queue is full, the new audio chunk is silently discarded.
 
     def _stt_processor_task(self):
         stream = self.recognizer.create_stream()
@@ -95,22 +98,19 @@ class PresentationController:
                 # 3. PUBLISH: If new text is available, publish the latest words.
                 if text := self.recognizer.get_result(stream):
                     normalized_text = text_normalizer.normalize_text(text)
-                    latest_words = normalized_text.strip().split()[-self.window_size :]
-
-                    if not latest_words:
+                    if not (
+                        latest_words := normalized_text.strip().split()[
+                            -self.window_size :
+                        ]
+                    ):
                         continue
 
-                    # Clear any stale data from the single-slot queue before putting the new one.
-                    try:
+                    # Clear stale data and publish new words
+                    with suppress(Empty):
                         self.words_queue.get_nowait()
-                    except Empty:
-                        pass
-
-                    try:
+                    with suppress(Full):
                         self.words_queue.put_nowait(latest_words)
-                    except Full:
-                        # Navigator is still busy with the previous data. This is fine.
-                        pass
+
             except Empty:
                 # Timeout occurred, loop continues to check shutdown_flag.
                 continue
@@ -134,10 +134,12 @@ class PresentationController:
 
                 # 2. PROCESS: Perform the heavy CS&SC calculation.
                 input_text = " ".join(current_words)
-                candidate_chunks = self.candidate_chunk_generator.get_candidate_chunks(
-                    self.current_section
-                )
-                if not candidate_chunks:
+                if not (
+                    candidate_chunks
+                    := self.candidate_chunk_generator.get_candidate_chunks(
+                        self.current_section
+                    )
+                ):
                     continue
 
                 similarity_results = self.similarity_calculator.compare(
@@ -145,8 +147,8 @@ class PresentationController:
                 )
 
                 # TODO: Add a check for similarity score threshold here. e.g., if similarity_results[0].score > 0.65:
-                best_result = similarity_results[0]
-                best_chunk = best_result.chunk
+                top_match = similarity_results[0]
+                best_chunk = top_match.chunk
                 target_section = best_chunk.source_sections[-1]
 
                 # 3. ACT: If a valid navigation is found, send keyboard commands.
@@ -160,13 +162,13 @@ class PresentationController:
                 self.shutdown_flag.set()
 
     def _perform_navigation(self, target_section, current_words, best_chunk):
-        current_idx = self.current_section.section_index
-        target_idx = target_section.section_index
-        distance = target_idx - current_idx
+        current_slide = self.current_section.section_index
+        target_slide = target_section.section_index
+        slide_delta = target_slide - current_slide
 
-        if distance != 0:
-            key_to_press = Key.right if distance > 0 else Key.left
-            for _ in range(abs(distance)):
+        if slide_delta != 0:
+            key_to_press = Key.right if slide_delta > 0 else Key.left
+            for _ in range(abs(slide_delta)):
                 self.keyboard_controller.press(key_to_press)
                 self.keyboard_controller.release(key_to_press)
                 time.sleep(0.01)  # Small delay for reliability
@@ -183,26 +185,28 @@ class PresentationController:
         print(f"  Match  -> ...{recent_match}")
 
     def _on_key_press(self, key):
-        if key == Key.right:
-            current_idx = self.current_section.section_index
-            if current_idx < len(self.sections) - 1:
-                self.current_section = self.sections[current_idx + 1]
-                print(
-                    f"\n[Manual] Next: {self.current_section.section_index + 1}/{len(self.sections)}"
-                )
-        elif key == Key.left:
-            current_idx = self.current_section.section_index
-            if current_idx > 0:
-                self.current_section = self.sections[current_idx - 1]
-                print(
-                    f"\n[Manual] Previous: {self.current_section.section_index + 1}/{len(self.sections)}"
-                )
-        elif key == Key.insert:
-            self.paused = not self.paused
-            status = "Paused" if self.paused else "Resumed"
-            print(
-                f"\n[{status}] Automatic navigation is now {'OFF' if self.paused else 'ON'}."
-            )
+        current_slide = self.current_section.section_index
+
+        match key:
+            case Key.right:
+                if current_slide < len(self.sections) - 1:
+                    self.current_section = self.sections[current_slide + 1]
+                    print(
+                        f"\n[Manual] Next: {self.current_section.section_index + 1}/{len(self.sections)}"
+                    )
+            case Key.left:
+                if current_slide > 0:
+                    self.current_section = self.sections[current_slide - 1]
+                    print(
+                        f"\n[Manual] Previous: {self.current_section.section_index + 1}/{len(self.sections)}"
+                    )
+            case Key.insert:
+                self.paused = not self.paused
+                match self.paused:
+                    case True:
+                        print("\n[Paused] Automatic navigation is now OFF.")
+                    case False:
+                        print("\n[Resumed] Automatic navigation is now ON.")
 
     def control(self):
         self.stt_processor_thread.start()
