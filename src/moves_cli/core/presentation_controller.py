@@ -10,7 +10,7 @@ from sherpa_onnx import OnlineRecognizer
 
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
-from moves_cli.data.models import Section
+from moves_cli.data.models import Chunk, Section
 from moves_cli.utils import data_handler, model_downloader, text_normalizer
 
 
@@ -20,6 +20,8 @@ class PresentationController:
     AUDIO_QUEUE_SIZE = 5
     WORDS_QUEUE_SIZE = 1
     NUM_THREADS = 8
+    DISPLAY_WORD_COUNT = 7
+    KEY_PRESS_DELAY = 0.01
     MODEL_DIR = Path(
         data_handler.DATA_FOLDER / "ml_models" / "nemo-streaming-stt-480ms-int8"
     )
@@ -28,11 +30,12 @@ class PresentationController:
         self,
         sections: list[Section],
         window_size: int = 12,
-    ):
+    ) -> None:
         # Core state
         self.window_size = window_size
         self.sections = sections
         self.current_section = sections[0]
+        self.section_lock = threading.Lock()
         self.paused = False
         self.shutdown_flag = threading.Event()
 
@@ -78,12 +81,12 @@ class PresentationController:
         )
         self.keyboard_listener = Listener(on_press=self._on_key_press)
 
-    def _audio_sampler_callback(self, indata, frames, time, status):
+    def _audio_sampler_callback(self, indata, frames, time, status) -> None:
         if not self.audio_queue.full():
             with suppress(Full):
                 self.audio_queue.put_nowait(indata[:, 0].copy())
 
-    def _stt_processor_task(self):
+    def _stt_processor_task(self) -> None:
         stream = self.recognizer.create_stream()
         while not self.shutdown_flag.is_set():
             try:
@@ -118,7 +121,7 @@ class PresentationController:
                 print(f"Error in STT Processor thread: {e}")
                 self.shutdown_flag.set()
 
-    def _navigator_task(self):
+    def _navigator_task(self) -> None:
         previous_words = []
         while not self.shutdown_flag.is_set():
             try:
@@ -134,10 +137,13 @@ class PresentationController:
 
                 # 2. PROCESS: Perform the heavy CS&SC calculation.
                 input_text = " ".join(current_words)
+                with self.section_lock:
+                    current_section = self.current_section
+
                 if not (
                     candidate_chunks
                     := self.candidate_chunk_generator.get_candidate_chunks(
-                        self.current_section
+                        current_section
                     )
                 ):
                     continue
@@ -161,54 +167,60 @@ class PresentationController:
                 print(f"Error in Navigator thread: {e}")
                 self.shutdown_flag.set()
 
-    def _perform_navigation(self, target_section, current_words, best_chunk):
-        current_slide = self.current_section.section_index
-        target_slide = target_section.section_index
-        slide_delta = target_slide - current_slide
+    def _perform_navigation(
+        self, target_section: Section, current_words: list[str], best_chunk: Chunk
+    ) -> None:
+        with self.section_lock:
+            current_slide = self.current_section.section_index
+            target_slide = target_section.section_index
+            slide_delta = target_slide - current_slide
 
-        if slide_delta != 0:
-            key_to_press = Key.right if slide_delta > 0 else Key.left
-            for _ in range(abs(slide_delta)):
-                self.keyboard_controller.press(key_to_press)
-                self.keyboard_controller.release(key_to_press)
-                time.sleep(0.01)  # Small delay for reliability
+            if slide_delta != 0:
+                key_to_press = Key.right if slide_delta > 0 else Key.left
+                for _ in range(abs(slide_delta)):
+                    self.keyboard_controller.press(key_to_press)
+                    self.keyboard_controller.release(key_to_press)
+                    time.sleep(self.KEY_PRESS_DELAY)  # Small delay for reliability
 
-        self.current_section = target_section
+            self.current_section = target_section
 
         # Print status for user feedback
-        recent_speech = " ".join(current_words[-7:])
-        recent_match = " ".join(best_chunk.partial_content.strip().split()[-7:])
+        recent_speech = " ".join(current_words[-self.DISPLAY_WORD_COUNT :])
+        recent_match = " ".join(
+            best_chunk.partial_content.strip().split()[-self.DISPLAY_WORD_COUNT :]
+        )
         print(
             f"\n[{target_section.section_index + 1}/{len(self.sections)}] Match Found"
         )
         print(f"  Speech -> ...{recent_speech}")
         print(f"  Match  -> ...{recent_match}")
 
-    def _on_key_press(self, key):
-        current_slide = self.current_section.section_index
+    def _on_key_press(self, key) -> None:
+        with self.section_lock:
+            current_slide = self.current_section.section_index
 
-        match key:
-            case Key.right:
-                if current_slide < len(self.sections) - 1:
-                    self.current_section = self.sections[current_slide + 1]
-                    print(
-                        f"\n[Manual] Next: {self.current_section.section_index + 1}/{len(self.sections)}"
-                    )
-            case Key.left:
-                if current_slide > 0:
-                    self.current_section = self.sections[current_slide - 1]
-                    print(
-                        f"\n[Manual] Previous: {self.current_section.section_index + 1}/{len(self.sections)}"
-                    )
-            case Key.insert:
-                self.paused = not self.paused
-                match self.paused:
-                    case True:
-                        print("\n[Paused] Automatic navigation is now OFF.")
-                    case False:
-                        print("\n[Resumed] Automatic navigation is now ON.")
+            match key:
+                case Key.right:
+                    if current_slide < len(self.sections) - 1:
+                        self.current_section = self.sections[current_slide + 1]
+                        print(
+                            f"\n[Manual] Next: {self.current_section.section_index + 1}/{len(self.sections)}"
+                        )
+                case Key.left:
+                    if current_slide > 0:
+                        self.current_section = self.sections[current_slide - 1]
+                        print(
+                            f"\n[Manual] Previous: {self.current_section.section_index + 1}/{len(self.sections)}"
+                        )
+                case Key.insert:
+                    self.paused = not self.paused
+                    match self.paused:
+                        case True:
+                            print("\n[Paused] Automatic navigation is now OFF.")
+                        case False:
+                            print("\n[Resumed] Automatic navigation is now ON.")
 
-    def control(self):
+    def control(self) -> None:
         self.stt_processor_thread.start()
         self.navigator_thread.start()
         self.keyboard_listener.start()
