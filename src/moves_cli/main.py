@@ -11,15 +11,11 @@ def speaker_manager_instance():
     return SpeakerManager()
 
 
-def presentation_controller_instance(
-    sections: list[Section], start_section: Section, window_size: int
-):
-    typer.echo("Loading speech recognition models (this may take a while)...")
+def presentation_controller_instance(sections: list[Section], window_size: int):
     from moves_cli.core.presentation_controller import PresentationController
 
     controller = PresentationController(
         sections=sections,
-        start_section=start_section,
         window_size=window_size,
     )
     return controller
@@ -421,19 +417,15 @@ def presentation_control(
             typer.echo("Error: No sections found in processed data.", err=True)
             raise typer.Exit(1)
 
-        # Determine starting section (first section)
-        start_section = sections[0]
-
         window_size = 12
 
-        controller = presentation_controller_instance(
-            sections, start_section, window_size=window_size
-        )
+        typer.echo("Starting control session...")
+
+        controller = presentation_controller_instance(sections, window_size=window_size)
 
         typer.echo(
-            f"Starting presentation control for '{resolved_speaker.name}' ({resolved_speaker.speaker_id})."
+            f"\nPresentation control started for '{resolved_speaker.name}' ({resolved_speaker.speaker_id})."
         )
-        typer.echo("    Sections loaded and chunks created.")
         typer.echo("    READY & LISTENING\n")
         typer.echo("    Press Ctrl+C to exit.")
         typer.echo("    \nKeyboard controls:")
