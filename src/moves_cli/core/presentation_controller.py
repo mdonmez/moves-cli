@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 from contextlib import suppress
@@ -5,13 +6,23 @@ from pathlib import Path
 from queue import Empty, Full, Queue
 
 import sounddevice as sd
-from pynput.keyboard import Controller, Key, Listener
+from pynput.keyboard import Controller, Key
 from sherpa_onnx import OnlineRecognizer
 
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.data.models import Chunk, Section
 from moves_cli.utils import data_handler, model_downloader, text_normalizer
+
+# Configure logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.propagate = False
 
 
 class PresentationController:
@@ -36,7 +47,6 @@ class PresentationController:
         self.sections = sections
         self.current_section = sections[0]
         self.section_lock = threading.Lock()
-        self.paused = False
         self.shutdown_flag = threading.Event()
 
         # Inter-thread communication
@@ -79,7 +89,6 @@ class PresentationController:
         self.navigator_thread = threading.Thread(
             target=self._navigator_task, daemon=True
         )
-        self.keyboard_listener = Listener(on_press=self._on_key_press)
 
     def _audio_sampler_callback(self, indata, frames, time, status) -> None:
         if not self.audio_queue.full():
@@ -118,7 +127,7 @@ class PresentationController:
                 # Timeout occurred, loop continues to check shutdown_flag.
                 continue
             except Exception as e:
-                print(f"Error in STT Processor thread: {e}")
+                logger.error(f"Error in STT Processor thread: {e}")
                 self.shutdown_flag.set()
 
     def _navigator_task(self) -> None:
@@ -129,8 +138,7 @@ class PresentationController:
                 current_words = self.words_queue.get(timeout=1)
 
                 if (
-                    self.paused
-                    or len(current_words) < self.window_size
+                    len(current_words) < self.window_size
                     or current_words == previous_words
                 ):
                     continue
@@ -164,7 +172,7 @@ class PresentationController:
             except Empty:
                 continue
             except Exception as e:
-                print(f"Error in Navigator thread: {e}")
+                logger.error(f"Error in Navigator thread: {e}")
                 self.shutdown_flag.set()
 
     def _perform_navigation(
@@ -184,46 +192,20 @@ class PresentationController:
 
             self.current_section = target_section
 
-        # Print status for user feedback
+        # Log status for user feedback
         recent_speech = " ".join(current_words[-self.DISPLAY_WORD_COUNT :])
         recent_match = " ".join(
             best_chunk.partial_content.strip().split()[-self.DISPLAY_WORD_COUNT :]
         )
-        print(
-            f"\n[{target_section.section_index + 1}/{len(self.sections)}] Match Found"
+        logger.info(
+            f"[{target_section.section_index + 1}/{len(self.sections)}] Match Found\n"
+            f"  Speech -> ...{recent_speech}\n"
+            f"  Match  -> ...{recent_match}\n"
         )
-        print(f"  Speech -> ...{recent_speech}")
-        print(f"  Match  -> ...{recent_match}")
-
-    def _on_key_press(self, key) -> None:
-        with self.section_lock:
-            current_slide = self.current_section.section_index
-
-            match key:
-                case Key.right:
-                    if current_slide < len(self.sections) - 1:
-                        self.current_section = self.sections[current_slide + 1]
-                        print(
-                            f"\n[Manual] Next: {self.current_section.section_index + 1}/{len(self.sections)}"
-                        )
-                case Key.left:
-                    if current_slide > 0:
-                        self.current_section = self.sections[current_slide - 1]
-                        print(
-                            f"\n[Manual] Previous: {self.current_section.section_index + 1}/{len(self.sections)}"
-                        )
-                case Key.insert:
-                    self.paused = not self.paused
-                    match self.paused:
-                        case True:
-                            print("\n[Paused] Automatic navigation is now OFF.")
-                        case False:
-                            print("\n[Resumed] Automatic navigation is now ON.")
 
     def control(self) -> None:
         self.stt_processor_thread.start()
         self.navigator_thread.start()
-        self.keyboard_listener.start()
 
         BLOCKSIZE = int(self.SAMPLE_RATE * self.FRAME_DURATION)
 
@@ -240,14 +222,11 @@ class PresentationController:
                     self.shutdown_flag.wait(timeout=0.5)
 
         except KeyboardInterrupt:
-            print("\nGracefully shutting down...")
+            logger.info("\nGracefully shutting down...")
         except Exception as e:
-            print(f"\nAn error occurred in the audio stream: {e}")
+            logger.error(f"\nAn error occurred in the audio stream: {e}")
 
         finally:
-            if self.keyboard_listener.is_alive():
-                self.keyboard_listener.stop()
-
             self.shutdown_flag.set()
 
             threads_to_join = [self.stt_processor_thread, self.navigator_thread]
@@ -255,4 +234,4 @@ class PresentationController:
                 if thread.is_alive():
                     thread.join(timeout=2.0)
 
-            print("Shut down successfully.")
+            logger.info("Shut down successfully\n")
