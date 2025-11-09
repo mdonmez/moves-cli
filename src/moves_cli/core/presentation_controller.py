@@ -33,6 +33,7 @@ class PresentationController:
     NUM_THREADS = 8
     DISPLAY_WORD_COUNT = 7
     KEY_PRESS_DELAY = 0.01
+    SIMILARITY_THRESHOLD = 0.65
     MODEL_DIR = Path(
         data_handler.DATA_FOLDER / "ml_models" / "nemo-streaming-stt-480ms-int8"
     )
@@ -137,10 +138,7 @@ class PresentationController:
                 # 1. WAIT: Efficiently waits for a new word list to arrive.
                 current_words = self.words_queue.get(timeout=1)
 
-                if (
-                    len(current_words) < self.window_size
-                    or current_words == previous_words
-                ):
+                if current_words == previous_words:
                     continue
 
                 # 2. PROCESS: Perform the heavy CS&SC calculation.
@@ -160,8 +158,12 @@ class PresentationController:
                     input_text, candidate_chunks
                 )
 
-                # TODO: Add a check for similarity score threshold here. e.g., if similarity_results[0].score > 0.65:
                 top_match = similarity_results[0]
+
+                # Check if similarity score meets threshold
+                if top_match.score < self.SIMILARITY_THRESHOLD:
+                    continue
+
                 best_chunk = top_match.chunk
                 target_section = best_chunk.source_sections[-1]
 
