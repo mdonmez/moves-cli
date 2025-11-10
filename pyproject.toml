@@ -3,6 +3,7 @@ name = "moves-cli"
 version = "1.1.0"
 description = "Presentation control, reimagined."
 readme = "README.md"
+license = { text = "GNU General Public License v3.0" }
 authors = [
     { name = "mdonmez", email = "124686256+mdonmez@users.noreply.github.com" }
 ]
@@ -26,6 +27,11 @@ dependencies = [
 
 [project.scripts]
 moves = "moves_cli.main:app"
+
+[project.urls]
+homepage = "https://github.com/mdonmez/moves-cli"
+repository = "https://github.com/mdonmez/moves-cli"
+documentation = "https://github.com/mdonmez/moves-cli/tree/master/docs"
 
 [build-system]
 requires = ["uv_build>=0.9.2,<0.10.0"]
