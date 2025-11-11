@@ -2,7 +2,6 @@ import logging
 import threading
 import time
 from contextlib import suppress
-from pathlib import Path
 from queue import Empty, Full, Queue
 
 import sounddevice as sd
@@ -11,8 +10,8 @@ from sherpa_onnx import OnlineRecognizer
 
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
-from moves_cli.data.models import Section
-from moves_cli.utils import data_handler, model_downloader, text_normalizer
+from moves_cli.data.models import Section, SttModel
+from moves_cli.utils import model_preparer, text_normalizer
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -34,26 +33,15 @@ class PresentationController:
     QUEUE_TIMEOUT = 1.0
     THREAD_JOIN_TIMEOUT = 2.0
     SHUTDOWN_CHECK_INTERVAL = 0.5
-    MODEL_DIR = Path(
-        data_handler.DATA_FOLDER / "ml_models" / "nemo-streaming-stt-480ms-int8"
-    )
+    MODEL_DIR = SttModel.model_dir
 
     def __init__(
         self,
         sections: list[Section],
         window_size: int = 12,
     ) -> None:
-        self.window_size = window_size
-        self.sections = sections
-        self.current_section = sections[0]
-        self.section_lock = threading.Lock()
-        self.shutdown_flag = threading.Event()
+        model_preparer.prepare_models()
 
-        self.audio_queue = Queue(maxsize=PresentationController.AUDIO_QUEUE_SIZE)
-        self.words_queue = Queue(maxsize=PresentationController.WORDS_QUEUE_SIZE)
-
-        model_downloader.download_model("embedding")
-        model_downloader.download_model("stt")
         try:
             self.recognizer = OnlineRecognizer.from_transducer(
                 tokens=str(self.MODEL_DIR.joinpath("tokens.txt")),
@@ -67,6 +55,15 @@ class PresentationController:
             raise RuntimeError(
                 f"Failed to load STT model from {self.MODEL_DIR}: {e}"
             ) from e
+
+        self.window_size = window_size
+        self.sections = sections
+        self.current_section = sections[0]
+        self.section_lock = threading.Lock()
+        self.shutdown_flag = threading.Event()
+
+        self.audio_queue = Queue(maxsize=PresentationController.AUDIO_QUEUE_SIZE)
+        self.words_queue = Queue(maxsize=PresentationController.WORDS_QUEUE_SIZE)
 
         self.chunks = chunk_producer.generate_chunks(sections, window_size)
         self.candidate_chunk_generator = chunk_producer.CandidateChunkGenerator(
@@ -217,7 +214,7 @@ class PresentationController:
                     self.shutdown_flag.wait(timeout=self.SHUTDOWN_CHECK_INTERVAL)
 
         except KeyboardInterrupt:
-            logger.info("\nGracefully shutting down...")
+            logger.info("\nShutting down...")
         except Exception as e:
             logger.error(f"\nAn error occurred in the audio stream: {e}")
 
@@ -229,4 +226,4 @@ class PresentationController:
                 if thread.is_alive():
                     thread.join(timeout=self.THREAD_JOIN_TIMEOUT)
 
-            logger.info("Shut down successfully\n")
+            logger.info("Shut down successfully.")

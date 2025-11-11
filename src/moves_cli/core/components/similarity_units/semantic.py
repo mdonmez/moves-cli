@@ -1,8 +1,6 @@
 import numpy as np
-from pathlib import Path
 
-from moves_cli.utils import data_handler
-from moves_cli.data.models import SimilarityResult, Chunk
+from moves_cli.data.models import Chunk, EmbeddingModel, SimilarityResult
 
 
 class Semantic:
@@ -11,15 +9,9 @@ class Semantic:
 
         self._embeddings: dict[int, np.ndarray] = {}
 
-        self._model_path = (
-            Path(data_handler.DATA_FOLDER)
-            / "ml_models"
-            / "all-MiniLM-L6-v2_quint8_avx2"
-        )
-
         self._model = TextEmbedding(
-            model_name="sentence-transformers/all-MiniLM-l6-v2",
-            specific_model_path=self._model_path,
+            model_name=EmbeddingModel.name,
+            specific_model_path=EmbeddingModel.model_dir,
         )
 
         if all_chunks:
@@ -50,3 +42,23 @@ class Semantic:
 
         except Exception as e:
             raise RuntimeError(f"Semantic similarity comparison failed: {e}") from e
+
+
+if __name__ == "__main__":
+    semantic = Semantic([])
+    results = semantic.compare(
+        "What is the capital of France?",
+        [
+            Chunk(
+                partial_content="Paris is the capital of France.", source_sections=[]
+            ),
+            Chunk(
+                partial_content="Berlin is the capital of Germany.", source_sections=[]
+            ),
+            Chunk(
+                partial_content="Madrid is the capital of Spain.", source_sections=[]
+            ),
+        ],
+    )
+    for result in results:
+        print(f"Score: {result.score:.4f}, Content: {result.chunk.partial_content}")

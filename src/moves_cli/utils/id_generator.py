@@ -6,10 +6,8 @@ from moves_cli.data.models import SpeakerId
 
 
 def generate_speaker_id(name: str) -> SpeakerId:
-    # Transliterate Unicode to ASCII
     ascii_name = unidecode(name)
 
-    # Create slug: replace spaces with hyphens, remove special chars, lowercase
     slug = (
         re.sub(
             r"\s+",

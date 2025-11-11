@@ -383,7 +383,7 @@ def presentation_control(
 ):
     """Start live voice-controlled presentation navigation (requires processed speaker)"""
     try:
-        typer.echo("Starting control session...")
+        typer.echo("Starting control session...\n")
         import json
         from moves_cli.core.components import section_producer
 
@@ -423,7 +423,7 @@ def presentation_control(
         controller = presentation_controller_instance(sections, window_size=window_size)
 
         typer.echo(
-            f"\nPresentation control started for '{resolved_speaker.name}' ({resolved_speaker.speaker_id})."
+            f"Presentation control started for '{resolved_speaker.name}' ({resolved_speaker.speaker_id})."
         )
         typer.echo("    [←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit\n")
 
