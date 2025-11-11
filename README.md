@@ -18,7 +18,6 @@ _Presentation control, reimagined._
   - [Quick Start](#quick-start)
   - [Command Overview](#command-overview)
 - [Documentation](#documentation)
-- [Tests](#tests)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -78,20 +77,20 @@ Create a speaker profile by providing a presentation and its corresponding trans
 
 ```bash
 # Add a speaker with their presentation and transcript
-moves speaker add "John Doe" ./path/to/presentation.pdf ./path/to/transcript.pdf
+moves speaker add john ./path/to/presentation.pdf ./path/to/transcript.pdf
 
 # Process the speaker's data
-moves speaker process "John Doe"
+moves speaker process john
 ```
 
 This step uses the configured LLM and may take a few moments to complete.
 
 #### 3\. Start the Control Session
 
-Open the presentation file in fullscreen mode and execute the `control` command.
+Open the presentation and execute the `control` command.
 
 ```bash
-moves presentation control "John Doe"
+moves presentation control john
 ```
 
 Once started, `moves` listens for your speech and sends `Right Arrow` key presses to advance the slides at the appropriate times.
@@ -110,33 +109,12 @@ For more details, please refer to the [CLI Commands](./docs/cli_commands.md).
 
 ## Documentation
 
+_Documentation is currently not up to date. It will be updated soon._
+
 For a detailed explanation of the system's architecture, components, and design, please refer to the [Documentation](./docs/README.MD), which covers:
 
 - **[Architecture](./docs/architecture.md):** A high-level overview of the system's structure.
 - **[Technical Details](./docs/about/README.md):** In-depth explanations of key components like the similarity engine, data models, and STT pipeline.
-
-## Tests
-
-`moves` includes a test suite. The test system uses `pytest`.
-
-### Running Tests
-
-```bash
-uv run pytest
-```
-
-### Test Coverage
-
-The test suite covers:
-
-- **CLI Integration** - Essential command-line operations and error handling
-- **Core Modules** - Settings editor, speaker manager, and presentation controller
-- **Components** - Chunk generation, section extraction, and similarity calculation
-- **Utilities** - Data handling, ID generation, model downloading, and text normalization
-
-**Current Status:** 55/55 tests passing
-
-For detailed information about the test structure, see the [Test System Documentation](./docs/about/tests.md).
 
 ## Contributing
 
