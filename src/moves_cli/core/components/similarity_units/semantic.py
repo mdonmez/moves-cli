@@ -42,23 +42,3 @@ class Semantic:
 
         except Exception as e:
             raise RuntimeError(f"Semantic similarity comparison failed: {e}") from e
-
-
-if __name__ == "__main__":
-    semantic = Semantic([])
-    results = semantic.compare(
-        "What is the capital of France?",
-        [
-            Chunk(
-                partial_content="Paris is the capital of France.", source_sections=[]
-            ),
-            Chunk(
-                partial_content="Berlin is the capital of Germany.", source_sections=[]
-            ),
-            Chunk(
-                partial_content="Madrid is the capital of Spain.", source_sections=[]
-            ),
-        ],
-    )
-    for result in results:
-        print(f"Score: {result.score:.4f}, Content: {result.chunk.partial_content}")

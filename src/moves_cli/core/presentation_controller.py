@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import threading
 import time
@@ -40,7 +41,7 @@ class PresentationController:
         sections: list[Section],
         window_size: int = 12,
     ) -> None:
-        model_preparer.prepare_models()
+        asyncio.run(model_preparer.prepare_models())
 
         try:
             self.recognizer = OnlineRecognizer.from_transducer(

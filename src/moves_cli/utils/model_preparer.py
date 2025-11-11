@@ -14,32 +14,29 @@ from rich.progress import (
     TextColumn,
 )
 
-from moves_cli.data.models import EmbeddingModel, MlModel, SttModel
-from moves_cli.utils import data_handler
+from moves_cli.data.models import EmbeddingModel, SttModel
 
 CHUNK_SIZE = 65536
 HTTP_TIMEOUT = 30.0
 MODELS = [EmbeddingModel, SttModel]
-MODELS_BASE_PATH = Path(data_handler.DATA_FOLDER) / "ml_models"
 
 console = Console(highlight=False, color_system=None)
 
 
 def _has_valid_checksum(filepath: Path, expected: str) -> bool:
-    if not filepath.exists():
-        return False
     try:
         hasher = xxhash.xxh3_64()
         with filepath.open("rb") as f:
-            while chunk := f.read(CHUNK_SIZE):
+            for chunk in iter(lambda: f.read(CHUNK_SIZE), b""):
                 hasher.update(chunk)
         return hasher.hexdigest() == expected
     except (OSError, IOError):
         return False
 
 
-def _remove_invalid_models() -> None:
-    if not MODELS_BASE_PATH.exists():
+def _clean_model_directory() -> None:
+    models_base_path = MODELS[0].model_dir.parent
+    if not models_base_path.exists():
         return
 
     valid_paths = set()
@@ -47,15 +44,14 @@ def _remove_invalid_models() -> None:
         valid_paths.add(model.model_dir)
         valid_paths.update(model.model_dir / filename for filename in model.files)
 
-    invalid = sorted(
-        set(MODELS_BASE_PATH.rglob("*")) - valid_paths,
-        key=lambda p: len(p.parts),
-        reverse=True,
-    )
+    invalid = set(models_base_path.rglob("*")) - valid_paths
 
     for path in invalid:
         try:
-            path.unlink() if path.is_file() else shutil.rmtree(path, ignore_errors=True)
+            if path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
         except (OSError, IOError):
             pass
 
@@ -96,30 +92,11 @@ async def _download_file(
     except Exception as e:
         progress.update(task_id, description=f"Failed: {filepath.name}")
         temp_path.unlink(missing_ok=True)
-        if not isinstance(e, RuntimeError):
-            raise RuntimeError(f"Download failed: {url}") from e
-        raise
+        raise RuntimeError(f"Download failed: {url}") from e
 
 
-def _create_download_tasks(
-    client: httpx.AsyncClient,
-    progress: Progress,
-    models: list[tuple[str, MlModel]],
-) -> list:
-    tasks = []
-    for name, model in models:
-        for filename, checksum in model.files.items():
-            url = f"{model.base_url}/{filename}"
-            filepath = model.model_dir / filename
-            tasks.append(_download_file(client, url, filepath, checksum, progress))
-    return tasks
-
-
-async def download_and_prepare_models() -> dict[str, Path]:
-    _remove_invalid_models()
-
-    models = [("embedding", EmbeddingModel), ("stt", SttModel)]
-    model_paths = {name: model.model_dir for name, model in models}
+async def prepare_models() -> bool:
+    _clean_model_directory()
 
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True) as client:
         with Progress(
@@ -130,11 +107,17 @@ async def download_and_prepare_models() -> dict[str, Path]:
             TaskProgressColumn(),
             console=console,
         ) as progress:
-            tasks = _create_download_tasks(client, progress, models)
+            tasks = [
+                _download_file(
+                    client,
+                    f"{model.base_url}/{filename}",
+                    model.model_dir / filename,
+                    checksum,
+                    progress,
+                )
+                for model in MODELS
+                for filename, checksum in model.files.items()
+            ]
             await asyncio.gather(*tasks)
 
-    return model_paths
-
-
-def prepare_models() -> dict[str, Path]:
-    return asyncio.run(download_and_prepare_models())
+    return True
