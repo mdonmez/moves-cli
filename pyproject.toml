@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.scripts]
-moves = "moves_cli.main:app"
+moves = "moves_cli.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/mdonmez/moves-cli"
@@ -41,7 +41,7 @@ requires = ["uv_build>=0.9.2,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-source-include = ["src/moves_cli/data/**", "src/moves_cli/core/components/ml_models/**"]
+source-include = ["src/moves_cli/data/**"]
 
 [dependency-groups]
 dev = [
