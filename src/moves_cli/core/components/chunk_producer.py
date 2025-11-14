@@ -1,5 +1,5 @@
 from moves_cli.utils import text_normalizer
-from moves_cli.data.models import Section, Chunk
+from moves_cli.models import Section, Chunk
 
 
 def generate_chunks(sections: list[Section], window_size: int) -> list[Chunk]:

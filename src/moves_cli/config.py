@@ -1,0 +1,12 @@
+from pathlib import Path
+
+# General configuration constants
+DATA_FOLDER: Path = Path.home() / ".moves"
+
+# Similarity calculator configuration
+SEMANTIC_WEIGHT: float = 0.6
+PHONETIC_WEIGHT: float = 0.4
+SIMILARITY_THRESHOLD: float = 0.7
+
+# Engine configuration
+WINDOW_SIZE: int = 12

@@ -6,7 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import Literal, cast
 
-from moves_cli.data.models import Section
+from moves_cli.models import Section
 
 
 def _extract_pdf(

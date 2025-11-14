@@ -1,7 +1,7 @@
 from typing import Optional
 import typer
 from pathlib import Path
-from moves_cli.data.models import Section
+from moves_cli.models import Section
 from moves_cli.utils import data_handler
 
 

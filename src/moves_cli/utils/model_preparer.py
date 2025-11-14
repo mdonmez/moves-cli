@@ -14,7 +14,7 @@ from rich.progress import (
     TextColumn,
 )
 
-from moves_cli.data.models import EmbeddingModel, SttModel
+from moves_cli.models import EmbeddingModel, SttModel
 
 CHUNK_SIZE = 65536
 HTTP_TIMEOUT = 30.0

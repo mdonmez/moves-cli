@@ -2,7 +2,7 @@ import re
 import secrets
 from unidecode import unidecode
 
-from moves_cli.data.models import SpeakerId
+from moves_cli.models import SpeakerId
 
 
 def generate_speaker_id(name: str) -> SpeakerId:

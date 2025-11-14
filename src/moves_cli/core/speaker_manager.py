@@ -3,8 +3,9 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from moves_cli.data.models import Speaker, ProcessResult
+from moves_cli.models import Speaker, ProcessResult
 from moves_cli.utils import id_generator, data_handler
+from moves_cli.config import WINDOW_SIZE
 
 
 class SpeakerManager:
@@ -80,7 +81,11 @@ class SpeakerManager:
         raise ValueError(f"No speaker found matching '{speaker_pattern}'.")
 
     def process(
-        self, speakers: list[Speaker], llm_model: str, llm_api_key: str
+        self,
+        speakers: list[Speaker],
+        llm_model: str,
+        llm_api_key: str,
+        window_size: int = WINDOW_SIZE,
     ) -> list[ProcessResult]:
         async def run():
             speaker_paths = [
@@ -193,7 +198,9 @@ class SpeakerManager:
                 )
 
                 # Generate chunks to get chunk count
-                chunks = chunk_producer.generate_chunks(sections, window_size=12)
+                chunks = chunk_producer.generate_chunks(
+                    sections, window_size=window_size
+                )
 
                 processing_time = time.perf_counter() - start_time
 

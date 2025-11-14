@@ -1,7 +1,7 @@
 from rapidfuzz import fuzz
 from jellyfish import metaphone
 
-from moves_cli.data.models import SimilarityResult, Chunk
+from moves_cli.models import SimilarityResult, Chunk
 
 
 class Phonetic:

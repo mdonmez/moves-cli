@@ -1,15 +1,16 @@
 from moves_cli.core.components.similarity_units.phonetic import Phonetic
 from moves_cli.core.components.similarity_units.semantic import Semantic
+from moves_cli.config import SEMANTIC_WEIGHT, PHONETIC_WEIGHT
 
-from moves_cli.data.models import Chunk, SimilarityResult
+from moves_cli.models import Chunk, SimilarityResult
 
 
 class SimilarityCalculator:
     def __init__(
         self,
         all_chunks: list[Chunk],
-        semantic_weight: float = 0.6,
-        phonetic_weight: float = 0.4,
+        semantic_weight: float = SEMANTIC_WEIGHT,
+        phonetic_weight: float = PHONETIC_WEIGHT,
     ):
         self.semantic_weight = semantic_weight
         self.phonetic_weight = phonetic_weight

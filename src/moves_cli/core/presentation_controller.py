@@ -4,6 +4,7 @@ import threading
 import time
 from contextlib import suppress
 from queue import Empty, Full, Queue
+from pathlib import Path
 
 import sounddevice as sd
 from pynput.keyboard import Controller, Key
@@ -11,8 +12,9 @@ from sherpa_onnx import OnlineRecognizer
 
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
-from moves_cli.data.models import Section, SttModel
+from moves_cli.models import Section, SttModel
 from moves_cli.utils import model_preparer, text_normalizer
+from moves_cli.config import WINDOW_SIZE, SIMILARITY_THRESHOLD
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -23,32 +25,35 @@ logger.propagate = False
 
 
 class PresentationController:
-    SAMPLE_RATE = 16000
-    FRAME_DURATION = 0.1
-    AUDIO_QUEUE_SIZE = 5
-    WORDS_QUEUE_SIZE = 1
-    NUM_THREADS = 8
-    DISPLAY_WORD_COUNT = 7
-    KEY_PRESS_DELAY = 0.01
-    SIMILARITY_THRESHOLD = 0.7
-    QUEUE_TIMEOUT = 1.0
-    THREAD_JOIN_TIMEOUT = 2.0
-    SHUTDOWN_CHECK_INTERVAL = 0.5
-    MODEL_DIR = SttModel.model_dir
+    # The logic specific constants defined here, for general configuration see config.py
+    SAMPLE_RATE: int = 16000
+    FRAME_DURATION: float = 0.1
+    AUDIO_QUEUE_SIZE: int = 5
+    WORDS_QUEUE_SIZE: int = 1
+    NUM_THREADS: int = 8
+    DISPLAY_WORD_COUNT: int = 7
+    KEY_PRESS_DELAY: float = 0.01
+    QUEUE_TIMEOUT: float = 1.0
+    THREAD_JOIN_TIMEOUT: float = 2.0
+    SHUTDOWN_CHECK_INTERVAL: float = 0.5
+    MODEL_DIR: Path = SttModel.model_dir
+    # from config.py
+    SIMILARITY_THRESHOLD: float = SIMILARITY_THRESHOLD
+    WINDOW_SIZE: int = WINDOW_SIZE
 
     def __init__(
         self,
         sections: list[Section],
-        window_size: int = 12,
+        window_size: int = WINDOW_SIZE,
     ) -> None:
         asyncio.run(model_preparer.prepare_models())
 
         try:
             self.recognizer = OnlineRecognizer.from_transducer(
-                tokens=str(self.MODEL_DIR.joinpath("tokens.txt")),
-                encoder=str(self.MODEL_DIR.joinpath("encoder.int8.onnx")),
-                decoder=str(self.MODEL_DIR.joinpath("decoder.int8.onnx")),
-                joiner=str(self.MODEL_DIR.joinpath("joiner.int8.onnx")),
+                tokens=str(self.MODEL_DIR / "tokens.txt"),
+                encoder=str(self.MODEL_DIR / "encoder.int8.onnx"),
+                decoder=str(self.MODEL_DIR / "decoder.int8.onnx"),
+                joiner=str(self.MODEL_DIR / "joiner.int8.onnx"),
                 num_threads=self.NUM_THREADS,
                 decoding_method="greedy_search",
             )

@@ -1,6 +1,6 @@
 import numpy as np
 
-from moves_cli.data.models import Chunk, EmbeddingModel, SimilarityResult
+from moves_cli.models import Chunk, EmbeddingModel, SimilarityResult
 
 
 class Semantic:
