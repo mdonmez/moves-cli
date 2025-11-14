@@ -1,7 +1,8 @@
 from pathlib import Path
 import shutil
+from moves_cli.config import DATA_FOLDER
 
-DATA_FOLDER = Path.home() / ".moves"
+DATA_FOLDER: Path = DATA_FOLDER
 
 
 def write(path: Path, data: str) -> bool:
