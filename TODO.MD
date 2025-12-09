@@ -1,0 +1,15 @@
+- [ ] When source file paths are detected for the `process` command, display them clearly and ask for confirmation (`y/n`) so the user can verify which files will be used and cancel before the LLM process starts if needed.
+- [ ] Decide on a consistent tab indentation size for all CLI output and apply it uniformly.
+- [ ] Replace all plain `print` statements with `typer.echo` for consistent CLI behavior.
+- [ ] Add a `--yes` flag to deletion commands along with an interactive confirmation prompt (similar to the source confirmation in `process`).
+- [ ] Improve the `progress` command’s terminal output to make it more dynamic rather than static.
+- [ ] Rewrite the logging module to use loguru.
+- [ ] Move the `'{name}' ({id})` formatting pattern into a utility so it can be applied consistently and automatically across the project based on the data model.
+- [ ] Move the `-3` and `+2` values into the configuration file.
+- [ ] Mask API keys by default and add a `--show` option to reveal them when necessary.
+- [ ] Switch back to cosine similarity instead of dot product for more reliable results.
+  - Normalize precomputed chunk embeddings: `self._norms[id(chunk)] = np.linalg.norm(embedding) or 1.0`
+  - Normalize input embedding: `input_embedding = input_embedding / np.linalg.norm(input_embedding)`
+  - Compute similarity using: `scores = candidate_matrix_normalized @ input_embedding`
+- [ ] Consider implementing the `add_completion=true` option.
+- [ ] Add a “last processed timestamp” to `speaker.json`.

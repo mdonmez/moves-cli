@@ -101,7 +101,7 @@ def speaker_edit(
         None, "--transcript", "-t", help="New transcript file path"
     ),
 ):
-    """Update speaker's source files (presentation or transcript paths)"""
+    """Update speaker's presentation and/or transcript files"""
     # Validate at least one parameter is provided
     if not source_presentation and not source_transcript:
         typer.echo(
@@ -158,7 +158,7 @@ def speaker_edit(
 
 @speaker_app.command("list")
 def speaker_list():
-    """List all registered speakers with ready status"""
+    """List all registered speakers with their status"""
     try:
         # Get all speakers
         speaker_manager = speaker_manager_instance()
@@ -199,7 +199,7 @@ def speaker_list():
 def speaker_show(
     speaker: str = typer.Argument(..., help="Speaker name or ID"),
 ):
-    """Display detailed speaker information"""
+    """Show detailed information about a speaker"""
     try:
         # Resolve speaker
         speaker_manager = speaker_manager_instance()
@@ -233,7 +233,7 @@ def speaker_process(
     speakers: Optional[list[str]] = typer.Argument(None, help="Speaker(s) to process"),
     all: bool = typer.Option(False, "--all", "-a", help="Process all speakers"),
 ):
-    """Generate presentation sections using AI for live control (requires model and API key)"""
+    """Process the speaker to get ready for the control (requires LLM model and API key)"""
     try:
         # Get instances
         speaker_manager = speaker_manager_instance()
@@ -325,7 +325,7 @@ def speaker_delete(
     speakers: Optional[list[str]] = typer.Argument(None, help="Speaker(s) to delete"),
     all: bool = typer.Option(False, "--all", "-a", help="Delete all speakers"),
 ):
-    """Remove speakers and their data"""
+    """Delete speaker(s) and their data"""
     try:
         # Get speaker manager instance
         speaker_manager = speaker_manager_instance()
