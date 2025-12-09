@@ -1,6 +1,6 @@
 [project]
 name = "moves-cli"
-version = "1.2.0"
+version = "1.3.0"
 description = "Presentation control, reimagined."
 readme = "README.md"
 license = { text = "GNU General Public License v3.0" }
