@@ -1,6 +1,6 @@
 from importlib.resources import files
 from pathlib import Path
-from typing import Literal, cast
+from typing import Callable, Literal, cast
 
 import instructor
 import pymupdf
@@ -95,11 +95,22 @@ def convert_to_objects(section_list: list[dict[str, str | int]]) -> list[Section
 
 
 def generate_sections(
-    presentation_path: Path, transcript_path: Path, llm_model: str, llm_api_key: str
+    presentation_path: Path,
+    transcript_path: Path,
+    llm_model: str,
+    llm_api_key: str,
+    callback: Callable[[str], None] | None = None,
 ) -> list[Section]:
+    if callback:
+        callback("Extracting presentation PDF...")
     presentation_data = _extract_pdf(presentation_path, "presentation")
+
+    if callback:
+        callback("Extracting transcript PDF...")
     transcript_data = _extract_pdf(transcript_path, "transcript")
 
+    if callback:
+        callback("Querying LLM model (this may take a while)...")
     section_contents = _call_llm(
         presentation_data=presentation_data,
         transcript_data=transcript_data,

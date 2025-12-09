@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from moves_cli.config import CANDIDATE_RANGE_MAX_OFFSET, CANDIDATE_RANGE_MIN_OFFSET
 from moves_cli.models import Chunk, Section
 from moves_cli.utils import text_normalizer
 
@@ -51,15 +52,18 @@ class CandidateChunkGenerator:
             min_sec_idx = chunk.source_sections[0].section_index
             max_sec_idx = chunk.source_sections[-1].section_index
 
-            start_candidate_range = max_sec_idx - 3
-            end_candidate_range = min_sec_idx + 2
+            start_candidate_range = max_sec_idx + CANDIDATE_RANGE_MIN_OFFSET
+            end_candidate_range = min_sec_idx + CANDIDATE_RANGE_MAX_OFFSET
 
             is_single_section = len(chunk.source_sections) == 1
             single_source_idx = min_sec_idx if is_single_section else -1
 
             for idx in range(start_candidate_range, end_candidate_range + 1):
                 if is_single_section:
-                    if single_source_idx == idx - 2 or single_source_idx == idx + 3:
+                    if (
+                        single_source_idx == idx - CANDIDATE_RANGE_MAX_OFFSET
+                        or single_source_idx == idx - CANDIDATE_RANGE_MIN_OFFSET
+                    ):
                         continue
 
                 self._index[idx].append(chunk)

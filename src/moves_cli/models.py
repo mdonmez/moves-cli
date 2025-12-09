@@ -24,6 +24,11 @@ class Speaker:
     speaker_id: SpeakerId
     source_presentation: Path
     source_transcript: Path
+    last_processed: str | None = None
+
+    @property
+    def label(self) -> str:
+        return f"'{self.name}' ({self.speaker_id})"
 
 
 @dataclass(frozen=True)
