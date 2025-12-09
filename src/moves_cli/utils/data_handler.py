@@ -1,5 +1,6 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
+
 from moves_cli.config import DATA_FOLDER
 
 DATA_FOLDER: Path = DATA_FOLDER

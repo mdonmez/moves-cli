@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+
 from moves_cli.utils import data_handler
 
 SpeakerId = str

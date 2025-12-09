@@ -3,18 +3,18 @@ import logging
 import threading
 import time
 from contextlib import suppress
-from queue import Empty, Full, Queue
 from pathlib import Path
+from queue import Empty, Full, Queue
 
 import sounddevice as sd
 from pynput.keyboard import Controller, Key
 from sherpa_onnx import OnlineRecognizer
 
+from moves_cli.config import SIMILARITY_THRESHOLD, WINDOW_SIZE
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.models import Section, SttModel
 from moves_cli.utils import model_preparer, text_normalizer
-from moves_cli.config import WINDOW_SIZE, SIMILARITY_THRESHOLD
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()

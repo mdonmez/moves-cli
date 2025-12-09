@@ -1,14 +1,14 @@
-import tomlkit
 import copy
 from importlib.resources import files
-from typing import Dict, Any
+from typing import Any, Dict
+
+import tomlkit
 
 from moves_cli.models import Settings
 from moves_cli.utils import data_handler
 
 
 class SettingsEditor:
-    # Get absolute path to the template file relative to the package
     template = files("moves_cli.data") / "settings_template.toml"
     settings = data_handler.DATA_FOLDER / "settings.toml"
 

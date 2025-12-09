@@ -16,6 +16,7 @@ class Semantic:
 
         if all_chunks:
             chunk_contents = [chunk.partial_content for chunk in all_chunks]
+
             chunk_embeddings = list(self._model.embed(chunk_contents))
 
             for chunk, embedding in zip(all_chunks, chunk_embeddings):
@@ -24,21 +25,24 @@ class Semantic:
     def compare(
         self, input_str: str, candidates: list[Chunk]
     ) -> list[SimilarityResult]:
+        if not candidates:
+            return []
+
         try:
-            input_embedding = list(self._model.embed([input_str]))[0]
+            input_embedding = next(iter(self._model.embed([input_str])))
 
-            candidate_embeddings = [
-                self._embeddings[id(candidate)] for candidate in candidates
+            candidate_matrix = np.array(
+                [self._embeddings[id(c)] for c in candidates], dtype=np.float32
+            )
+
+            scores = candidate_matrix @ input_embedding
+
+            sorted_indices = np.argsort(scores)[::-1]
+
+            return [
+                SimilarityResult(chunk=candidates[i], score=float(scores[i]))
+                for i in sorted_indices
             ]
-
-            cosine_scores = np.dot(candidate_embeddings, input_embedding)
-
-            results = [
-                SimilarityResult(chunk=candidate, score=float(score))
-                for candidate, score in zip(candidates, cosine_scores)
-            ]
-            results.sort(key=lambda x: x.score, reverse=True)
-            return results
 
         except Exception as e:
             raise RuntimeError(f"Semantic similarity comparison failed: {e}") from e

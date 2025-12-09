@@ -1,7 +1,6 @@
+from moves_cli.config import PHONETIC_WEIGHT, SEMANTIC_WEIGHT
 from moves_cli.core.components.similarity_units.phonetic import Phonetic
 from moves_cli.core.components.similarity_units.semantic import Semantic
-from moves_cli.config import SEMANTIC_WEIGHT, PHONETIC_WEIGHT
-
 from moves_cli.models import Chunk, SimilarityResult
 
 
@@ -30,26 +29,31 @@ class SimilarityCalculator:
             phonetic_scores = {id(res.chunk): res.score for res in phonetic_results}
             semantic_scores = {id(res.chunk): res.score for res in semantic_results}
 
-            max_p = max(phonetic_scores.values())
-            max_s = max(semantic_scores.values())
+            max_p = max(phonetic_scores.values()) if phonetic_scores else 1.0
+            max_s = max(semantic_scores.values()) if semantic_scores else 1.0
+
+            if max_p == 0:
+                max_p = 1.0
+            if max_s == 0:
+                max_s = 1.0
 
             batch_quality = (self.phonetic_weight * max_p) + (
                 self.semantic_weight * max_s
             )
 
-            final_results = []
-            for candidate in candidates:
-                cid = id(candidate)
-                norm_p = phonetic_scores[cid] / max_p
-                norm_s = semantic_scores[cid] / max_s
-                relative = (self.phonetic_weight * norm_p) + (
-                    self.semantic_weight * norm_s
-                )
-                weighted_score = relative * batch_quality
+            factor_p = (self.phonetic_weight * batch_quality) / max_p
+            factor_s = (self.semantic_weight * batch_quality) / max_s
 
-                final_results.append(
-                    SimilarityResult(chunk=candidate, score=weighted_score)
+            final_results = [
+                SimilarityResult(
+                    chunk=candidate,
+                    score=(
+                        phonetic_scores.get(id(candidate), 0.0) * factor_p
+                        + semantic_scores.get(id(candidate), 0.0) * factor_s
+                    ),
                 )
+                for candidate in candidates
+            ]
 
             final_results.sort(key=lambda x: x.score, reverse=True)
 

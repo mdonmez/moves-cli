@@ -3,9 +3,9 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from moves_cli.models import Speaker, ProcessResult
-from moves_cli.utils import id_generator, data_handler
 from moves_cli.config import WINDOW_SIZE
+from moves_cli.models import ProcessResult, Speaker
+from moves_cli.utils import data_handler, id_generator
 
 
 class SpeakerManager:
@@ -92,18 +92,15 @@ class SpeakerManager:
                 self.SPEAKERS_PATH / speaker.speaker_id for speaker in speakers
             ]
 
-            # Validate all speakers' files upfront before starting async processing
             for speaker, speaker_path in zip(speakers, speaker_paths):
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
                 local_presentation = speaker_path / "presentation.pdf"
                 local_transcript = speaker_path / "transcript.pdf"
 
-                # Determine file sources
                 presentation_from = None
                 transcript_from = None
 
-                # Check presentation file
                 if source_presentation.exists():
                     presentation_from = "SOURCE"
                 elif local_presentation.exists():
@@ -113,7 +110,6 @@ class SpeakerManager:
                         f"Missing presentation file for speaker '{speaker.name}' ({speaker.speaker_id})"
                     )
 
-                # Check transcript file
                 if source_transcript.exists():
                     transcript_from = "SOURCE"
                 elif local_transcript.exists():
@@ -123,7 +119,6 @@ class SpeakerManager:
                         f"Missing transcript file for speaker '{speaker.name}' ({speaker.speaker_id})"
                     )
 
-                # Print file sources for the speaker
                 file_sources = (
                     f"{presentation_from} presentation & {transcript_from} transcript"
                 )
@@ -135,7 +130,6 @@ class SpeakerManager:
             async def process_speaker(speaker, speaker_path, delay):
                 import time
 
-                # File location checking and moving operations at the top
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
 
@@ -144,7 +138,6 @@ class SpeakerManager:
 
                 presentation_path, transcript_path = None, None
 
-                # Handle presentation file
                 if source_presentation.exists():
                     data_handler.copy(source_presentation, speaker_path)
                     if source_presentation.name != "presentation.pdf":
@@ -160,7 +153,6 @@ class SpeakerManager:
                         f"Missing presentation file for speaker '{speaker.name}' ({speaker.speaker_id})"
                     )
 
-                # Handle transcript file
                 if source_transcript.exists():
                     data_handler.copy(source_transcript, speaker_path)
                     if source_transcript.name != "transcript.pdf":
@@ -176,11 +168,9 @@ class SpeakerManager:
                         f"Missing transcript file for speaker '{speaker.name}' ({speaker.speaker_id})"
                     )
 
-                # Apply staggered delay before LLM API calls to avoid rate limiting
                 await asyncio.sleep(delay)
 
-                # Lazy import - only load when processing is actually needed (after file validation)
-                from moves_cli.core.components import section_producer, chunk_producer
+                from moves_cli.core.components import chunk_producer, section_producer
 
                 start_time = time.perf_counter()
 
@@ -197,7 +187,6 @@ class SpeakerManager:
                     json.dumps(section_producer.convert_to_list(sections), indent=2),
                 )
 
-                # Generate chunks to get chunk count
                 chunks = chunk_producer.generate_chunks(
                     sections, window_size=window_size
                 )

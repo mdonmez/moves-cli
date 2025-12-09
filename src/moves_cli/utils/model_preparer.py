@@ -1,5 +1,5 @@
 import asyncio
-import shutil
+import os
 from pathlib import Path
 
 import httpx
@@ -16,18 +16,22 @@ from rich.progress import (
 
 from moves_cli.models import EmbeddingModel, SttModel
 
-CHUNK_SIZE = 65536
+CHUNK_SIZE = 1024 * 1024
 HTTP_TIMEOUT = 30.0
+MAX_CONCURRENT_DOWNLOADS = 4
 MODELS = [EmbeddingModel, SttModel]
 
 console = Console(highlight=False, color_system=None)
 
 
-def _has_valid_checksum(filepath: Path, expected: str) -> bool:
+def _verify_checksum_sync(filepath: Path, expected: str) -> bool:
+    if not filepath.exists():
+        return False
+
     try:
         hasher = xxhash.xxh3_64()
         with filepath.open("rb") as f:
-            for chunk in iter(lambda: f.read(CHUNK_SIZE), b""):
+            while chunk := f.read(CHUNK_SIZE):
                 hasher.update(chunk)
         return hasher.hexdigest() == expected
     except (OSError, IOError):
@@ -39,21 +43,32 @@ def _clean_model_directory() -> None:
     if not models_base_path.exists():
         return
 
-    valid_paths = set()
+    valid_files = set()
+    valid_dirs = set()
+
     for model in MODELS:
-        valid_paths.add(model.model_dir)
-        valid_paths.update(model.model_dir / filename for filename in model.files)
+        valid_dirs.add(model.model_dir.resolve())
+        for filename in model.files:
+            full_path = (model.model_dir / filename).resolve()
+            valid_files.add(full_path)
 
-    invalid = set(models_base_path.rglob("*")) - valid_paths
+    for path in models_base_path.rglob("*"):
+        resolved = path.resolve()
 
-    for path in invalid:
-        try:
-            if path.is_file():
-                path.unlink()
-            elif path.is_dir():
-                shutil.rmtree(path, ignore_errors=True)
-        except (OSError, IOError):
-            pass
+        if resolved.is_file() and resolved not in valid_files:
+            try:
+                resolved.unlink()
+            except OSError:
+                pass
+
+    for root, dirs, files in os.walk(models_base_path, topdown=False):
+        for name in dirs:
+            d_path = Path(root) / name
+            if d_path.resolve() not in valid_dirs:
+                try:
+                    d_path.rmdir()
+                except OSError:
+                    pass
 
 
 async def _download_file(
@@ -62,35 +77,42 @@ async def _download_file(
     filepath: Path,
     checksum: str,
     progress: Progress,
+    semaphore: asyncio.Semaphore,
 ) -> None:
-    if _has_valid_checksum(filepath, checksum):
+    is_valid = await asyncio.to_thread(_verify_checksum_sync, filepath, checksum)
+    if is_valid:
         return
 
     task_id = progress.add_task(filepath.name, total=None)
-    temp_path = filepath.with_suffix(filepath.suffix + ".tmp")
+    temp_path = filepath.with_suffix(".tmp")
 
     try:
-        async with client.stream("GET", url) as response:
-            response.raise_for_status()
-            progress.update(
-                task_id, total=int(response.headers.get("content-length", 0))
-            )
+        async with semaphore:
+            async with client.stream("GET", url) as response:
+                response.raise_for_status()
 
-            filepath.parent.mkdir(parents=True, exist_ok=True)
-            with temp_path.open("wb") as f:
-                async for chunk in response.aiter_bytes():
-                    f.write(chunk)
-                    progress.advance(task_id, len(chunk))
+                total_size = int(response.headers.get("content-length", 0))
+                progress.update(task_id, total=total_size)
+
+                filepath.parent.mkdir(parents=True, exist_ok=True)
+
+                with temp_path.open("wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=CHUNK_SIZE):
+                        f.write(chunk)
+                        progress.advance(task_id, len(chunk))
 
         temp_path.replace(filepath)
 
-        if not _has_valid_checksum(filepath, checksum):
-            progress.update(task_id, description=f"Corrupt: {filepath.name}")
+        is_valid = await asyncio.to_thread(_verify_checksum_sync, filepath, checksum)
+        if not is_valid:
+            progress.update(task_id, description=f"[red]Corrupt: {filepath.name}")
             filepath.unlink(missing_ok=True)
             raise RuntimeError(f"Checksum mismatch: {filepath.name}")
 
+        progress.update(task_id, visible=False)
+
     except Exception as e:
-        progress.update(task_id, description=f"Failed: {filepath.name}")
+        progress.update(task_id, description=f"[red]Failed: {filepath.name}")
         temp_path.unlink(missing_ok=True)
         raise RuntimeError(f"Download failed: {url}") from e
 
@@ -98,10 +120,16 @@ async def _download_file(
 async def prepare_models() -> bool:
     _clean_model_directory()
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True) as client:
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+    async with httpx.AsyncClient(
+        timeout=HTTP_TIMEOUT,
+        follow_redirects=True,
+        limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+    ) as client:
         with Progress(
             SpinnerColumn(),
-            TextColumn("  [progress.description]{task.description}"),
+            TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             DownloadColumn(),
             TaskProgressColumn(),
@@ -114,10 +142,12 @@ async def prepare_models() -> bool:
                     model.model_dir / filename,
                     checksum,
                     progress,
+                    semaphore,
                 )
                 for model in MODELS
                 for filename, checksum in model.files.items()
             ]
+
             await asyncio.gather(*tasks)
 
     return True

@@ -1,6 +1,8 @@
-from typing import Optional
-import typer
 from pathlib import Path
+from typing import Optional
+
+import typer
+
 from moves_cli.models import Section
 from moves_cli.utils import data_handler
 
@@ -385,6 +387,7 @@ def presentation_control(
     try:
         typer.echo("Starting control session...")
         import json
+
         from moves_cli.core.components import section_producer
 
         # Get speaker manager

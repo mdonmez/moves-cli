@@ -1,10 +1,11 @@
-import instructor
 from importlib.resources import files
-from litellm import completion
-import pymupdf
 from pathlib import Path
-from pydantic import BaseModel, Field
 from typing import Literal, cast
+
+import instructor
+import pymupdf
+from litellm import completion
+from pydantic import BaseModel, Field
 
 from moves_cli.models import Section
 

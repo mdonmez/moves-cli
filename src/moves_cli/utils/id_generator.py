@@ -1,5 +1,6 @@
 import re
 import secrets
+
 from unidecode import unidecode
 
 from moves_cli.models import SpeakerId
