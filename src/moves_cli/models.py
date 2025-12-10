@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from moves_cli.utils import data_handler
+from moves_cli.config import DATA_FOLDER
 
 SpeakerId = str
 
@@ -69,7 +69,7 @@ EmbeddingModel = MlModel(
         "tokenizer.json": "9a86f184b2242391",
         "tokenizer_config.json": "829f09aa4433a19d",
     },
-    model_dir=data_handler.DATA_FOLDER / "ml_models" / "all-MiniLM-L6-v2_quint8_avx2",
+    model_dir=DATA_FOLDER / "ml_models" / "all-MiniLM-L6-v2_quint8_avx2",
 )
 
 SttModel = MlModel(
@@ -81,5 +81,5 @@ SttModel = MlModel(
         "joiner.int8.onnx": "84a3ae887bf7b986",
         "tokens.txt": "14f59574d9b3e62f",
     },
-    model_dir=data_handler.DATA_FOLDER / "ml_models" / "nemo-streaming-stt-480ms-int8",
+    model_dir=DATA_FOLDER / "ml_models" / "nemo-streaming-stt-480ms-int8",
 )
