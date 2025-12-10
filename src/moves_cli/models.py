@@ -46,7 +46,6 @@ class Settings:
 @dataclass(frozen=True)
 class ProcessResult:
     section_count: int
-    chunk_count: int
     speaker_id: SpeakerId
     processing_time_seconds: float
 

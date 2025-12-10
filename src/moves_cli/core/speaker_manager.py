@@ -16,8 +16,6 @@ from rich.progress import (
 )
 from rich.text import Text
 
-from moves_cli.config import WINDOW_SIZE
-from moves_cli.core.components import chunk_producer
 from moves_cli.models import ProcessResult, Speaker
 from moves_cli.utils import id_generator
 from moves_cli.utils.data_handler import DataHandler

@@ -335,9 +335,7 @@ def speaker_process(
             result = results[0]
             speaker = speaker_list[0]
             typer.echo(f"Speaker {speaker.label} processed.")
-            typer.echo(
-                f"{result.section_count} sections have been created and will be split into {result.chunk_count} chunks for control."
-            )
+            typer.echo(f"{result.section_count} sections have been created.")
             typer.echo(
                 f"The processing time took {result.processing_time_seconds:.1f} seconds."
             )
@@ -349,7 +347,7 @@ def speaker_process(
             for i, result in enumerate(results):
                 speaker = speaker_list[i]
                 typer.echo(
-                    f"{speaker.label} -> {result.section_count} sections & {result.chunk_count} chunks ({result.processing_time_seconds:.1f}s)"
+                    f"{speaker.label} -> {result.section_count} sections ({result.processing_time_seconds:.1f}s)"
                 )
 
             typer.echo(f"The processing time took {total_time:.1f} seconds for total.")
