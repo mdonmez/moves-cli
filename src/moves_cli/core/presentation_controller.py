@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import threading
 import time
 from contextlib import suppress
@@ -15,13 +14,6 @@ from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.models import Section, SttModel
 from moves_cli.utils import model_preparer, text_normalizer
-
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter("%(message)s"))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-logger.propagate = False
 
 
 class PresentationController:
@@ -114,8 +106,7 @@ class PresentationController:
 
             except Empty:
                 continue
-            except Exception as e:
-                logger.error(f"Error in STT Processor thread: {e}")
+            except Exception:
                 self.shutdown_flag.set()
 
     def _navigator_task(self) -> None:
@@ -146,34 +137,6 @@ class PresentationController:
                 top_match = similarity_results[0]
                 best_chunk = top_match.chunk
                 target_section = best_chunk.source_sections[-1]
-                slide_delta = (
-                    target_section.section_index - current_section.section_index
-                )
-
-                slide_position = (
-                    f"{current_section.section_index + 1}/{len(self.sections)}"
-                )
-                similarity_pct = f"%{int(top_match.score * 100)}"
-
-                match (top_match.score >= self.SIMILARITY_THRESHOLD, slide_delta):
-                    case (False, _):
-                        status = "✖"
-                    case (True, 0):
-                        status = "■"
-                    case (True, delta) if delta > 0:
-                        status = f"▶ {abs(delta)}"
-                    case (True, delta):
-                        status = f"◀ {abs(delta)}"
-
-                speech_preview = " ".join(current_words[-self.DISPLAY_WORD_COUNT :])
-                match_words = best_chunk.partial_content.strip().split()
-                match_preview = " ".join(match_words[-self.DISPLAY_WORD_COUNT :])
-
-                logger.info(
-                    f"{slide_position} | {similarity_pct} | {status}\n"
-                    f"    Speech → ...{speech_preview}\n"
-                    f"    Match  → ...{match_preview}\n"
-                )
 
                 if top_match.score >= self.SIMILARITY_THRESHOLD:
                     self._perform_navigation(target_section)
@@ -182,8 +145,7 @@ class PresentationController:
 
             except Empty:
                 continue
-            except Exception as e:
-                logger.error(f"Error in Navigator thread: {e}")
+            except Exception:
                 self.shutdown_flag.set()
 
     def _perform_navigation(self, target_section: Section) -> None:
@@ -220,9 +182,9 @@ class PresentationController:
                     self.shutdown_flag.wait(timeout=self.SHUTDOWN_CHECK_INTERVAL)
 
         except KeyboardInterrupt:
-            logger.info("\nShutting down...")
-        except Exception as e:
-            logger.error(f"\nAn error occurred in the audio stream: {e}")
+            pass
+        except Exception:
+            pass
 
         finally:
             self.shutdown_flag.set()
@@ -231,5 +193,3 @@ class PresentationController:
             for thread in threads_to_join:
                 if thread.is_alive():
                     thread.join(timeout=self.THREAD_JOIN_TIMEOUT)
-
-            logger.info("Shut down successfully.")
