@@ -15,8 +15,10 @@ from rich.progress import (
 from rich.text import Text
 
 from moves_cli.config import WINDOW_SIZE
+from moves_cli.core.components import chunk_producer
 from moves_cli.models import ProcessResult, Speaker
-from moves_cli.utils import data_handler, id_generator
+from moves_cli.utils import id_generator
+from moves_cli.utils.data_handler import DataHandler
 
 
 class MsecondsElapsedColumn(ProgressColumn):
@@ -28,8 +30,9 @@ class MsecondsElapsedColumn(ProgressColumn):
 
 
 class SpeakerManager:
-    def __init__(self):
-        self.SPEAKERS_PATH = data_handler.DATA_FOLDER.resolve() / "speakers"
+    def __init__(self, data_handler: DataHandler):
+        self.data_handler = data_handler
+        self.SPEAKERS_PATH = self.data_handler.DATA_FOLDER.resolve() / "speakers"
 
     def add(
         self, name: str, source_presentation: Path, source_transcript: Path

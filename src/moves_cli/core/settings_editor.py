@@ -5,19 +5,21 @@ from typing import Any, Dict
 import tomlkit
 
 from moves_cli.models import Settings
-from moves_cli.utils import data_handler
+from moves_cli.utils.data_handler import DataHandler
 
 
 class SettingsEditor:
     template = files("moves_cli.data") / "settings_template.toml"
-    settings = data_handler.DATA_FOLDER / "settings.toml"
 
-    def __init__(self):
+    def __init__(self, data_handler: DataHandler):
+        self.data_handler = data_handler
+        self.settings = self.data_handler.DATA_FOLDER / "settings.toml"
+
         self._template_doc = tomlkit.parse(self.template.read_text())
         self._template_defaults: Dict[str, Any] = dict(self._template_doc)
 
         try:
-            user_data = dict(tomlkit.parse(data_handler.read(self.settings)))
+            user_data = dict(tomlkit.parse(self.data_handler.read(self.settings)))
         except Exception:
             user_data = {}
 

@@ -5,14 +5,15 @@ from typing import Optional
 import typer
 
 from moves_cli.models import Section
-from moves_cli.utils import data_handler
+from moves_cli.utils.data_handler import DataHandler
 from moves_cli.config import WINDOW_SIZE
 
 
 def speaker_manager_instance():
     from moves_cli.core.speaker_manager import SpeakerManager
 
-    return SpeakerManager()
+    data_handler = DataHandler()
+    return SpeakerManager(data_handler)
 
 
 def presentation_controller_instance(sections: list[Section], window_size: int):
@@ -28,7 +29,8 @@ def presentation_controller_instance(sections: list[Section], window_size: int):
 def settings_editor_instance():
     from moves_cli.core.settings_editor import SettingsEditor
 
-    return SettingsEditor()
+    data_handler = DataHandler()
+    return SettingsEditor(data_handler)
 
 
 def version_callback(value: bool):
@@ -162,6 +164,7 @@ def speaker_edit(
 def speaker_list():
     """List all registered speakers with their status"""
     try:
+        data_handler = DataHandler()
         # Get all speakers
         speaker_manager = speaker_manager_instance()
         speakers = speaker_manager.list()
@@ -226,6 +229,7 @@ def speaker_show(
 ):
     """Show detailed information about a speaker"""
     try:
+        data_handler = DataHandler()
         # Resolve speaker
         speaker_manager = speaker_manager_instance()
         resolved_speaker = speaker_manager.resolve(speaker)
@@ -441,10 +445,9 @@ def presentation_control(
         typer.echo("Starting control session...")
         import json
 
-        from moves_cli.core.components import section_producer
-
         # Get speaker manager
         speaker_manager = speaker_manager_instance()
+        data_handler = DataHandler()
 
         # Resolve speaker
         resolved_speaker = speaker_manager.resolve(speaker)
