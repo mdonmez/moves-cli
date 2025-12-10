@@ -443,8 +443,9 @@ def presentation_control(
 ):
     """Start live voice-controlled presentation navigation (requires processed speaker)"""
     try:
-        typer.echo("Starting control session...")
         import json
+
+        from rich.progress import Progress, SpinnerColumn, TextColumn
 
         # Get speaker manager
         speaker_manager = speaker_manager_instance()
@@ -485,9 +486,18 @@ def presentation_control(
 
         window_size = WINDOW_SIZE
 
-        controller = presentation_controller_instance(sections, window_size=window_size)
+        # Initialize controller with loading spinner
+        with Progress(
+            SpinnerColumn(style=""),
+            TextColumn("{task.description}"),
+            transient=True,
+        ) as progress:
+            progress.add_task(description="Starting control session...", total=None)
+            controller = presentation_controller_instance(
+                sections, window_size=window_size
+            )
 
-        typer.echo(f"\nPresentation control started for {resolved_speaker.label}.")
+        typer.echo(f"Presentation control started for {resolved_speaker.label}.")
         typer.echo("    [←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit\n")
 
         controller.control()
