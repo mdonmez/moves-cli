@@ -1,9 +1,9 @@
 - [x] When source file paths are detected for the `process` command, display them clearly and ask for confirmation (`y/n`) so the user can verify which files will be used and cancel before the LLM process starts if needed.
-- [ ] Decide on a consistent tab indentation size for all CLI output and apply it uniformly.
+- [ ] Decide on a consistent tab indentation size for all CLI output and apply it uniformly. — Also consider rethinking the entire view for the CLI to make it more user-friendly.
 - [x] Replace all plain `print` statements with `typer.echo` for consistent CLI behavior.
 - [x] Add a `--yes` flag to deletion commands along with an interactive confirmation prompt (similar to the source confirmation in `process`).
 - [x] Improve the `process` command’s terminal output to make it more dynamic rather than static.
-- [ ] Rewrite the logging module to use loguru.
+- [x] ~~Rewrite the logging util to use loguru.~~ Decided against — I will delay loggings for writing better logging utility.
 - [x] Move the `'{name}' ({id})` formatting pattern into a data model so it can be applied consistently and automatically across the project based on the structure.
 - [x] Move the `-3` and `+2` values into the configuration file.
 - [x] Mask API keys by default and add a `--show` option to reveal them when necessary.
@@ -11,7 +11,7 @@
   - [x] Normalize precomputed chunk embeddings: `self._norms[id(chunk)] = np.linalg.norm(embedding) or 1.0`
   - [x] Normalize input embedding: `input_embedding = input_embedding / np.linalg.norm(input_embedding)`
   - [x] Compute similarity using: `scores = candidate_matrix_normalized @ input_embedding`
-- [ ] Consider implementing the `add_completion=true` option.
+- [x] ~~Consider implementing the `add_completion=true` option.~~ Decided against — requires manual user setup (`--install-completion`).
 - [x] Add a “last processed timestamp” to `speaker.json`.
 - [x] Refactor internal modules so that their dependencies are injected through external parameters, making them easier to test.
 - [x] Fix `data_handler.copy` logic to properly handle source/target paths when they are already absolute or relative to `DATA_FOLDER` (currently may double-prepend `DATA_FOLDER`).

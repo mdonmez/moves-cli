@@ -22,7 +22,3 @@ This utility is responsible for creating unique, file-system-safe identifiers fo
 
 1.  It processes the user-provided name by first normalizing it with `unicodedata.normalize("NFKD", ...)` to decompose characters and then encoding to ASCII, effectively converting characters like "é" to "e". It then creates a URL-safe "slug".
 2.  It appends a short, cryptographically secure random string using Python's `secrets` module. This guarantees uniqueness even if multiple speakers have the same name, preventing data collisions.
-
-### Logger (`logger`)
-
-The logging utility provides a structured and configurable logging system. A key feature is its dynamic module detection. Upon instantiation, the `Logger` uses Python's `inspect.stack()` to identify the filename of the module that is creating the logger instance. It then uses this module name to create a dedicated log file within `~/.moves/logs/` (e.g., `speaker_manager.log`, `presentation_controller.log`). This automatic segregation of logs by component greatly simplifies debugging and troubleshooting. The logs are managed by a `RotatingFileHandler`, which automatically archives and rotates log files when they reach a certain size, preventing excessive disk usage.
