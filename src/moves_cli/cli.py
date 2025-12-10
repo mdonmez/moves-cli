@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+import asyncio
 
 import typer
 
@@ -323,8 +324,10 @@ def speaker_process(
             typer.echo(f"Processing {len(speaker_list)} speakers...")
 
         # Call speaker_manager.process with resolved speakers
-        results = speaker_manager.process(
-            speaker_list, settings.model, settings.key, skip_confirmation=yes
+        results = asyncio.run(
+            speaker_manager.process(
+                speaker_list, settings.model, settings.key, skip_confirmation=yes
+            )
         )
 
         # Display results in Direct Summary format

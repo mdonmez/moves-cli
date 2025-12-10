@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import signal
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -104,179 +106,179 @@ class SpeakerManager:
 
         raise ValueError(f"No speaker found matching '{speaker_pattern}'.")
 
-    def process(
+    async def process(
         self,
         speakers: list[Speaker],
         llm_model: str,
         llm_api_key: str,
-        window_size: int = WINDOW_SIZE,
         skip_confirmation: bool = False,
     ) -> list[ProcessResult]:
-        async def run():
-            speaker_paths = [
-                self.SPEAKERS_PATH / speaker.speaker_id for speaker in speakers
-            ]
+        speaker_paths = [
+            self.SPEAKERS_PATH / speaker.speaker_id for speaker in speakers
+        ]
 
-            typer.echo(f"Processing Plan for {len(speakers)} speaker(s):\n")
+        typer.echo(f"Processing Plan for {len(speakers)} speaker(s):\n")
 
-            for speaker, speaker_path in zip(speakers, speaker_paths):
+        for speaker, speaker_path in zip(speakers, speaker_paths):
+            source_presentation = speaker.source_presentation
+            source_transcript = speaker.source_transcript
+            local_presentation = speaker_path / "presentation.pdf"
+            local_transcript = speaker_path / "transcript.pdf"
+
+            presentation_from = None
+            transcript_from = None
+
+            if source_presentation.exists():
+                presentation_from = "SOURCE"
+                pres_path_display = source_presentation
+            elif local_presentation.exists():
+                presentation_from = "LOCAL"
+                pres_path_display = local_presentation
+            else:
+                raise FileNotFoundError(
+                    f"Missing presentation file for speaker {speaker.label}"
+                )
+
+            if source_transcript.exists():
+                transcript_from = "SOURCE"
+                trans_path_display = source_transcript
+            elif local_transcript.exists():
+                transcript_from = "LOCAL"
+                trans_path_display = local_transcript
+            else:
+                raise FileNotFoundError(
+                    f"Missing transcript file for speaker {speaker.label}"
+                )
+
+            typer.echo(speaker.label)
+            typer.echo(f"    Presentation ({presentation_from}) -> {pres_path_display}")
+            typer.echo(f"    Transcript ({transcript_from}) -> {trans_path_display}")
+            typer.echo()
+
+        typer.echo()
+
+        if not skip_confirmation:
+            typer.confirm("Do you want to proceed?", default=True, abort=True)
+            typer.echo("Yes")
+            typer.echo()
+
+        # Use rich progress for dynamic feedback
+        with Progress(
+            SpinnerColumn(style=""),
+            TextColumn("{task.description}"),
+            MsecondsElapsedColumn(),
+            transient=True,
+        ) as progress:
+            # Install SIGINT handler to force exit on Ctrl+C
+            original_sigint = signal.getsignal(signal.SIGINT)
+
+            def sigint_handler(signum, frame):
+                progress.stop()
+                typer.echo("\nCancelled.")
+                os._exit(130)  # 128 + SIGINT(2)
+
+            signal.signal(signal.SIGINT, sigint_handler)
+
+            async def process_speaker(speaker, speaker_path, delay, task_id):
+                import time
+
+                start_time = time.perf_counter()
+
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
+
+                def progress_callback(msg: str):
+                    progress.update(
+                        task_id,
+                        description=f"Processing {speaker.label}... ({msg})",
+                    )
+
                 local_presentation = speaker_path / "presentation.pdf"
                 local_transcript = speaker_path / "transcript.pdf"
 
-                presentation_from = None
-                transcript_from = None
+                presentation_path, transcript_path = None, None
 
                 if source_presentation.exists():
-                    presentation_from = "SOURCE"
-                    pres_path_display = source_presentation
+                    progress_callback("Copying presentation...")
+                    self.data_handler.copy(source_presentation, speaker_path)
+                    if source_presentation.name != "presentation.pdf":
+                        relative_file_path = (
+                            speaker_path / source_presentation.name
+                        ).relative_to(self.data_handler.DATA_FOLDER)
+                        self.data_handler.rename(relative_file_path, "presentation.pdf")
+                    presentation_path = speaker_path / "presentation.pdf"
                 elif local_presentation.exists():
-                    presentation_from = "LOCAL"
-                    pres_path_display = local_presentation
+                    presentation_path = local_presentation
                 else:
                     raise FileNotFoundError(
                         f"Missing presentation file for speaker {speaker.label}"
                     )
 
                 if source_transcript.exists():
-                    transcript_from = "SOURCE"
-                    trans_path_display = source_transcript
+                    progress_callback("Copying transcript...")
+                    self.data_handler.copy(source_transcript, speaker_path)
+                    if source_transcript.name != "transcript.pdf":
+                        relative_file_path = (
+                            speaker_path / source_transcript.name
+                        ).relative_to(self.data_handler.DATA_FOLDER)
+                        self.data_handler.rename(relative_file_path, "transcript.pdf")
+                    transcript_path = speaker_path / "transcript.pdf"
                 elif local_transcript.exists():
-                    transcript_from = "LOCAL"
-                    trans_path_display = local_transcript
+                    transcript_path = local_transcript
                 else:
                     raise FileNotFoundError(
                         f"Missing transcript file for speaker {speaker.label}"
                     )
 
-                typer.echo(speaker.label)
-                typer.echo(
-                    f"    Presentation ({presentation_from}) -> {pres_path_display}"
+                await asyncio.sleep(delay)
+
+                from moves_cli.core.components.section_producer import (
+                    SectionProducer,
                 )
-                typer.echo(
-                    f"    Transcript ({transcript_from}) -> {trans_path_display}"
+
+                section_producer = SectionProducer()
+
+                sections = await asyncio.to_thread(
+                    section_producer.generate_sections,
+                    presentation_path=presentation_path,
+                    transcript_path=transcript_path,
+                    llm_model=llm_model,
+                    llm_api_key=llm_api_key,
+                    callback=progress_callback,
                 )
-                typer.echo()
 
-            typer.echo()
+                self.data_handler.write(
+                    speaker_path / "sections.json",
+                    json.dumps(section_producer.convert_to_list(sections), indent=2),
+                )
 
-            if not skip_confirmation:
-                typer.confirm("Do you want to proceed?", default=True, abort=True)
-                typer.echo()
+                processing_time = time.perf_counter() - start_time
 
-            # Use rich progress for dynamic feedback
-            with Progress(
-                SpinnerColumn(style=""),
-                TextColumn("{task.description}"),
-                MsecondsElapsedColumn(),
-                transient=True,
-            ) as progress:
+                # Update progress to show Done and freeze timer
+                progress.update(
+                    task_id,
+                    description=f"Processing {speaker.label}... Done",
+                )
+                progress.stop_task(task_id)
 
-                async def process_speaker(speaker, speaker_path, delay, task_id):
-                    import time
+                # Update speaker last_processed timestamp
+                speaker.last_processed = datetime.now().isoformat()
+                data = {
+                    k: str(v) if isinstance(v, Path) else v
+                    for k, v in asdict(speaker).items()
+                }
+                self.data_handler.write(
+                    speaker_path / "speaker.json", json.dumps(data, indent=4)
+                )
 
-                    start_time = time.perf_counter()
+                return ProcessResult(
+                    section_count=len(sections),
+                    speaker_id=speaker.speaker_id,
+                    processing_time_seconds=processing_time,
+                )
 
-                    source_presentation = speaker.source_presentation
-                    source_transcript = speaker.source_transcript
-
-                    def progress_callback(msg: str):
-                        progress.update(
-                            task_id,
-                            description=f"Processing {speaker.label}... ({msg})",
-                        )
-
-                    local_presentation = speaker_path / "presentation.pdf"
-                    local_transcript = speaker_path / "transcript.pdf"
-
-                    presentation_path, transcript_path = None, None
-
-                    if source_presentation.exists():
-                        progress_callback("Copying presentation...")
-                        self.data_handler.copy(source_presentation, speaker_path)
-                        if source_presentation.name != "presentation.pdf":
-                            relative_file_path = (
-                                speaker_path / source_presentation.name
-                            ).relative_to(self.data_handler.DATA_FOLDER)
-                            self.data_handler.rename(
-                                relative_file_path, "presentation.pdf"
-                            )
-                        presentation_path = speaker_path / "presentation.pdf"
-                    elif local_presentation.exists():
-                        presentation_path = local_presentation
-                    else:
-                        raise FileNotFoundError(
-                            f"Missing presentation file for speaker {speaker.label}"
-                        )
-
-                    if source_transcript.exists():
-                        progress_callback("Copying transcript...")
-                        self.data_handler.copy(source_transcript, speaker_path)
-                        if source_transcript.name != "transcript.pdf":
-                            relative_file_path = (
-                                speaker_path / source_transcript.name
-                            ).relative_to(self.data_handler.DATA_FOLDER)
-                            self.data_handler.rename(
-                                relative_file_path, "transcript.pdf"
-                            )
-                        transcript_path = speaker_path / "transcript.pdf"
-                    elif local_transcript.exists():
-                        transcript_path = local_transcript
-                    else:
-                        raise FileNotFoundError(
-                            f"Missing transcript file for speaker {speaker.label}"
-                        )
-
-                    await asyncio.sleep(delay)
-
-                    from moves_cli.core.components.section_producer import (
-                        SectionProducer,
-                    )
-
-                    section_producer = SectionProducer()
-
-                    sections = await asyncio.to_thread(
-                        section_producer.generate_sections,
-                        presentation_path=presentation_path,
-                        transcript_path=transcript_path,
-                        llm_model=llm_model,
-                        llm_api_key=llm_api_key,
-                        callback=progress_callback,
-                    )
-
-                    progress_callback("Generating chunks...")
-                    self.data_handler.write(
-                        speaker_path / "sections.json",
-                        json.dumps(
-                            section_producer.convert_to_list(sections), indent=2
-                        ),
-                    )
-
-                    chunks = chunk_producer.generate_chunks(
-                        sections, window_size=window_size
-                    )
-
-                    processing_time = time.perf_counter() - start_time
-
-                    # Update speaker last_processed timestamp
-                    speaker.last_processed = datetime.now().isoformat()
-                    data = {
-                        k: str(v) if isinstance(v, Path) else v
-                        for k, v in asdict(speaker).items()
-                    }
-                    self.data_handler.write(
-                        speaker_path / "speaker.json", json.dumps(data, indent=4)
-                    )
-
-                    return ProcessResult(
-                        section_count=len(sections),
-                        chunk_count=len(chunks),
-                        speaker_id=speaker.speaker_id,
-                        processing_time_seconds=processing_time,
-                    )
-
-                tasks = []
+            tasks = []
+            try:
                 for idx, (speaker, speaker_path) in enumerate(
                     zip(speakers, speaker_paths)
                 ):
@@ -287,8 +289,9 @@ class SpeakerManager:
 
                 results = await asyncio.gather(*tasks)
                 return results
-
-        return asyncio.run(run())
+            finally:
+                # Restore original signal handler
+                signal.signal(signal.SIGINT, original_sigint)
 
     def delete(self, speaker: Speaker) -> bool:
         speaker_path = self.SPEAKERS_PATH / speaker.speaker_id
