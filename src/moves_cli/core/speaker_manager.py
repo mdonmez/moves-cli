@@ -57,7 +57,9 @@ class SpeakerManager:
         data = {
             k: str(v) if isinstance(v, Path) else v for k, v in asdict(speaker).items()
         }
-        data_handler.write(speaker_path / "speaker.json", json.dumps(data, indent=4))
+        self.data_handler.write(
+            speaker_path / "speaker.json", json.dumps(data, indent=4)
+        )
         return speaker
 
     def edit(
@@ -76,7 +78,9 @@ class SpeakerManager:
         data = {
             k: str(v) if isinstance(v, Path) else v for k, v in asdict(speaker).items()
         }
-        data_handler.write(speaker_path / "speaker.json", json.dumps(data, indent=4))
+        self.data_handler.write(
+            speaker_path / "speaker.json", json.dumps(data, indent=4)
+        )
         return speaker
 
     def resolve(self, speaker_pattern: str) -> Speaker:
@@ -190,12 +194,14 @@ class SpeakerManager:
 
                     if source_presentation.exists():
                         progress_callback("Copying presentation...")
-                        data_handler.copy(source_presentation, speaker_path)
+                        self.data_handler.copy(source_presentation, speaker_path)
                         if source_presentation.name != "presentation.pdf":
                             relative_file_path = (
                                 speaker_path / source_presentation.name
-                            ).relative_to(data_handler.DATA_FOLDER)
-                            data_handler.rename(relative_file_path, "presentation.pdf")
+                            ).relative_to(self.data_handler.DATA_FOLDER)
+                            self.data_handler.rename(
+                                relative_file_path, "presentation.pdf"
+                            )
                         presentation_path = speaker_path / "presentation.pdf"
                     elif local_presentation.exists():
                         presentation_path = local_presentation
@@ -206,12 +212,14 @@ class SpeakerManager:
 
                     if source_transcript.exists():
                         progress_callback("Copying transcript...")
-                        data_handler.copy(source_transcript, speaker_path)
+                        self.data_handler.copy(source_transcript, speaker_path)
                         if source_transcript.name != "transcript.pdf":
                             relative_file_path = (
                                 speaker_path / source_transcript.name
-                            ).relative_to(data_handler.DATA_FOLDER)
-                            data_handler.rename(relative_file_path, "transcript.pdf")
+                            ).relative_to(self.data_handler.DATA_FOLDER)
+                            self.data_handler.rename(
+                                relative_file_path, "transcript.pdf"
+                            )
                         transcript_path = speaker_path / "transcript.pdf"
                     elif local_transcript.exists():
                         transcript_path = local_transcript
@@ -237,7 +245,7 @@ class SpeakerManager:
                     )
 
                     progress_callback("Generating chunks...")
-                    data_handler.write(
+                    self.data_handler.write(
                         speaker_path / "sections.json",
                         json.dumps(
                             section_producer.convert_to_list(sections), indent=2
@@ -256,7 +264,7 @@ class SpeakerManager:
                         k: str(v) if isinstance(v, Path) else v
                         for k, v in asdict(speaker).items()
                     }
-                    data_handler.write(
+                    self.data_handler.write(
                         speaker_path / "speaker.json", json.dumps(data, indent=4)
                     )
 
@@ -283,15 +291,15 @@ class SpeakerManager:
 
     def delete(self, speaker: Speaker) -> bool:
         speaker_path = self.SPEAKERS_PATH / speaker.speaker_id
-        return bool(data_handler.delete(speaker_path))
+        return bool(self.data_handler.delete(speaker_path))
 
     def list(self) -> list[Speaker]:
         speakers = []
-        for folder in data_handler.list(self.SPEAKERS_PATH):
+        for folder in self.data_handler.list(self.SPEAKERS_PATH):
             if folder.is_dir():
                 speaker_json = folder / "speaker.json"
                 if speaker_json.exists():
-                    data = json.loads(data_handler.read(speaker_json))
+                    data = json.loads(self.data_handler.read(speaker_json))
                     for k, v in data.items():
                         if isinstance(v, str) and ("/" in v or "\\" in v):
                             data[k] = Path(v)
