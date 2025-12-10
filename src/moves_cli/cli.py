@@ -586,7 +586,7 @@ def settings_set(
 def settings_unset(
     key: str = typer.Argument(..., help="Setting name to reset"),
 ):
-    """Reset a setting to its default value (model: gemini/gemini-2.0-flash, key: null)"""
+    """Reset a setting to its default value (model: gemini/gemini-2.5-flash-lite, key: null)"""
     try:
         # Create settings editor instance
         settings_editor = settings_editor_instance()

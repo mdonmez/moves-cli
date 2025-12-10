@@ -1,22 +1,22 @@
-import copy
-from importlib.resources import files
-from typing import Any, Dict
+from typing import Any
 
 import tomlkit
 
+from moves_cli.config import DEFAULT_API_KEY, DEFAULT_LLM_MODEL
 from moves_cli.models import Settings
 from moves_cli.utils.data_handler import DataHandler
 
 
 class SettingsEditor:
-    template = files("moves_cli.data") / "settings_template.toml"
-
     def __init__(self, data_handler: DataHandler):
         self.data_handler = data_handler
         self.settings = self.data_handler.DATA_FOLDER / "settings.toml"
 
-        self._template_doc = tomlkit.parse(self.template.read_text())
-        self._template_defaults: Dict[str, Any] = dict(self._template_doc)
+        # Define template defaults from config constants
+        self._template_defaults: dict[str, Any] = {
+            "model": DEFAULT_LLM_MODEL,
+            "key": DEFAULT_API_KEY,
+        }
 
         try:
             user_data = dict(tomlkit.parse(self.data_handler.read(self.settings)))
@@ -30,14 +30,15 @@ class SettingsEditor:
     def _save(self) -> bool:
         try:
             self.settings.parent.mkdir(parents=True, exist_ok=True)
-            node = copy.deepcopy(self._template_doc)
 
+            # Create a new tomlkit document with current data
+            doc = tomlkit.document()
             for key in self._template_defaults.keys():
                 if key in self._data:
-                    node[key] = self._data[key]
+                    doc[key] = self._data[key]
 
             with self.settings.open("w", encoding="utf-8") as f:
-                f.write(tomlkit.dumps(node))
+                f.write(tomlkit.dumps(doc))
             return True
         except Exception as e:
             raise RuntimeError(f"Failed to save settings: {e}") from e
