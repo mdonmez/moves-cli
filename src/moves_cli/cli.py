@@ -1,13 +1,13 @@
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-import asyncio
 
 import typer
 
+from moves_cli.config import DEFAULT_API_KEY, DEFAULT_LLM_MODEL, WINDOW_SIZE
 from moves_cli.models import Section
 from moves_cli.utils.data_handler import DataHandler
-from moves_cli.config import WINDOW_SIZE, DEFAULT_LLM_MODEL, DEFAULT_API_KEY
 
 
 def speaker_manager_instance():

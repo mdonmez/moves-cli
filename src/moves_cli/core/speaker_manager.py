@@ -293,7 +293,8 @@ class SpeakerManager:
 
     def delete(self, speaker: Speaker) -> bool:
         speaker_path = self.SPEAKERS_PATH / speaker.speaker_id
-        return bool(self.data_handler.delete(speaker_path))
+        result = bool(self.data_handler.delete(speaker_path))
+        return result
 
     def list(self) -> list[Speaker]:
         speakers = []
