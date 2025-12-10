@@ -16,7 +16,9 @@
 - [x] Refactor internal modules so that their dependencies are injected through external parameters, making them easier to test.
 - [x] Fix `data_handler.copy` logic to properly handle source/target paths when they are already absolute or relative to `DATA_FOLDER` (currently may double-prepend `DATA_FOLDER`).
 - [x] Replace hardcoded `window_size = 12` in `cli.py` with `moves_cli.config.WINDOW_SIZE`.
-- [ ] Refactor `SpeakerManager.process` to be an `async` function and manage the `asyncio` event loop at the CLI level for better composability.
-- [ ] Remove chunk generation after processing, this will improve speed and UI issues like stuck on 'Generating chunks...' while multi-speaker processing. Also in the multi-speaker case, show 'Done' if the individual speaker processing is done.
-- [ ] Add a loading dots to the `presentation control` command to show the loading status just like the `process` command.
-- [ ] The `settings --help` command's `unset` help's description's default LLM model is not correct, we should use the default LLM model from the config file.
+- [x] Refactor `SpeakerManager.process` to be an `async` function and manage the `asyncio` event loop at the CLI level for better composability.
+- [x] Remove chunk generation after processing, this will improve speed and UI issues like stuck on 'Generating chunks...' while multi-speaker processing. Also in the multi-speaker case, show 'Done' if the individual speaker processing is done.
+- [x] Add a loading dots to the `presentation control` command to show the loading status just like the `process` command.
+- [x] Remove the settings_template.toml file and move its contents into the config file instead. But still keep the settings file at `.moves` for holding the user's settings. We will just make code changes to use the config file instead of the template file for clarity.
+  - [x] The `settings --help` command's `unset` help's description's default LLM model is not correct, we should use the default LLM model from the config file.
+- [x] The cancel command should cancel the current processing and not wait for it to finish.
