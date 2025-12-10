@@ -6,6 +6,7 @@ import typer
 
 from moves_cli.models import Section
 from moves_cli.utils import data_handler
+from moves_cli.config import WINDOW_SIZE
 
 
 def speaker_manager_instance():
@@ -473,7 +474,7 @@ def presentation_control(
             typer.echo("Error: No sections found in processed data.", err=True)
             raise typer.Exit(1)
 
-        window_size = 12
+        window_size = WINDOW_SIZE
 
         controller = presentation_controller_instance(sections, window_size=window_size)
 

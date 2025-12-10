@@ -20,7 +20,8 @@ class Semantic:
             chunk_embeddings = list(self._model.embed(chunk_contents))
 
             for chunk, embedding in zip(all_chunks, chunk_embeddings):
-                self._embeddings[id(chunk)] = embedding
+                norm = np.linalg.norm(embedding) or 1.0
+                self._embeddings[id(chunk)] = embedding / norm
 
     def compare(
         self, input_str: str, candidates: list[Chunk]
@@ -30,6 +31,7 @@ class Semantic:
 
         try:
             input_embedding = next(iter(self._model.embed([input_str])))
+            input_embedding = input_embedding / (np.linalg.norm(input_embedding) or 1.0)
 
             candidate_matrix = np.array(
                 [self._embeddings[id(c)] for c in candidates], dtype=np.float32

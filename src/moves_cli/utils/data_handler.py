@@ -6,6 +6,19 @@ from moves_cli.config import DATA_FOLDER
 DATA_FOLDER: Path = DATA_FOLDER
 
 
+def _resolve_path(path: Path) -> Path:
+    path = Path(path)
+    if path.is_absolute():
+        return path
+
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(DATA_FOLDER)
+        return resolved
+    except ValueError:
+        return DATA_FOLDER / path
+
+
 def write(path: Path, data: str) -> bool:
     full_path = DATA_FOLDER / Path(path)
     try:
@@ -77,8 +90,8 @@ def delete(path: Path) -> bool:
 
 
 def copy(source: Path, target: Path) -> bool:
-    source_path = DATA_FOLDER / Path(source)
-    target_path = DATA_FOLDER / Path(target)
+    source_path = _resolve_path(source)
+    target_path = _resolve_path(target)
 
     if not source_path.exists():
         raise FileNotFoundError(f"Source not found: {source}")

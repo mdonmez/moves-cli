@@ -7,9 +7,13 @@
 - [x] Move the `'{name}' ({id})` formatting pattern into a data model so it can be applied consistently and automatically across the project based on the structure.
 - [x] Move the `-3` and `+2` values into the configuration file.
 - [x] Mask API keys by default and add a `--show` option to reveal them when necessary.
-- [ ] Switch back to cosine similarity instead of dot product for more reliable results.
-  - Normalize precomputed chunk embeddings: `self._norms[id(chunk)] = np.linalg.norm(embedding) or 1.0`
-  - Normalize input embedding: `input_embedding = input_embedding / np.linalg.norm(input_embedding)`
-  - Compute similarity using: `scores = candidate_matrix_normalized @ input_embedding`
+- [x] Switch back to cosine similarity instead of dot product for more reliable results.
+  - [x] Normalize precomputed chunk embeddings: `self._norms[id(chunk)] = np.linalg.norm(embedding) or 1.0`
+  - [x] Normalize input embedding: `input_embedding = input_embedding / np.linalg.norm(input_embedding)`
+  - [x] Compute similarity using: `scores = candidate_matrix_normalized @ input_embedding`
 - [ ] Consider implementing the `add_completion=true` option.
 - [x] Add a “last processed timestamp” to `speaker.json`.
+- [ ] Refactor internal modules so that their dependencies are injected through external parameters, making them easier to test.
+- [x] Fix `data_handler.copy` logic to properly handle source/target paths when they are already absolute or relative to `DATA_FOLDER` (currently may double-prepend `DATA_FOLDER`).
+- [x] Replace hardcoded `window_size = 12` in `cli.py` with `moves_cli.config.WINDOW_SIZE`.
+- [ ] Refactor `SpeakerManager.process` to be an `async` function and manage the `asyncio` event loop at the CLI level for better composability.
