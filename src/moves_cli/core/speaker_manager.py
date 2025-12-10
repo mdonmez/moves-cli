@@ -230,10 +230,11 @@ class SpeakerManager:
 
                     await asyncio.sleep(delay)
 
-                    from moves_cli.core.components import (
-                        chunk_producer,
-                        section_producer,
+                    from moves_cli.core.components.section_producer import (
+                        SectionProducer,
                     )
+
+                    section_producer = SectionProducer()
 
                     sections = await asyncio.to_thread(
                         section_producer.generate_sections,

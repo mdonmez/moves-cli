@@ -471,7 +471,12 @@ def presentation_control(
 
         # Load sections data
         sections_data = json.loads(data_handler.read(sections_file))
-        sections = section_producer.convert_to_objects(sections_data)
+
+        # Lazily import and instantiate SectionProducer
+        from moves_cli.core.components.section_producer import SectionProducer
+
+        sec_producer = SectionProducer()
+        sections = sec_producer.convert_to_objects(sections_data)
 
         if not sections:
             typer.echo("Error: No sections found in processed data.", err=True)
