@@ -404,6 +404,7 @@ def speaker_delete(
 
         if not yes:
             typer.confirm("Do you want to proceed?", default=True, abort=True)
+            typer.echo("Yes")
             typer.echo()
 
         # Display deletion message
