@@ -7,7 +7,7 @@ import typer
 
 from moves_cli.models import Section
 from moves_cli.utils.data_handler import DataHandler
-from moves_cli.config import WINDOW_SIZE
+from moves_cli.config import WINDOW_SIZE, DEFAULT_LLM_MODEL, DEFAULT_API_KEY
 
 
 def speaker_manager_instance():
@@ -583,11 +583,13 @@ def settings_set(
         raise typer.Exit(1)
 
 
-@settings_app.command("unset")
+@settings_app.command(
+    "unset",
+    help=f"Reset a setting to its default value (model: {DEFAULT_LLM_MODEL}, key: {DEFAULT_API_KEY})",
+)
 def settings_unset(
     key: str = typer.Argument(..., help="Setting name to reset"),
 ):
-    """Reset a setting to its default value (model: gemini/gemini-2.5-flash-lite, key: null)"""
     try:
         # Create settings editor instance
         settings_editor = settings_editor_instance()
