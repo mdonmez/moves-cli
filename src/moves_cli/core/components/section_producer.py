@@ -112,11 +112,11 @@ class SectionProducer:
         callback: Callable[[str], None] | None = None,
     ) -> list[Section]:
         if callback:
-            callback("Extracting data...")
+            callback("Extracting presentation data...")
         presentation_data = self._extract_pdf(presentation_path, "presentation")
 
         if callback:
-            callback("Extracting data...")
+            callback("Extracting transcript data...")
         transcript_data = self._extract_pdf(transcript_path, "transcript")
 
         if callback:

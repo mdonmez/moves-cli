@@ -181,8 +181,6 @@ class SpeakerManager:
             async def process_speaker(speaker, speaker_path, delay, task_id):
                 import time
 
-                start_time = time.perf_counter()
-
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
 
@@ -192,6 +190,13 @@ class SpeakerManager:
                         description=f"{speaker.label}: {msg}",
                     )
 
+                progress_callback("Waiting...")
+                await asyncio.sleep(delay)
+
+                progress.start_task(task_id)
+                start_time = time.perf_counter()
+                progress_callback("Starting...")
+
                 local_presentation = speaker_path / "presentation.pdf"
                 local_transcript = speaker_path / "transcript.pdf"
 
@@ -199,12 +204,18 @@ class SpeakerManager:
 
                 if source_presentation.exists():
                     progress_callback("Copying presentation...")
-                    self.data_handler.copy(source_presentation, speaker_path)
+                    await asyncio.to_thread(
+                        self.data_handler.copy, source_presentation, speaker_path
+                    )
                     if source_presentation.name != "presentation.pdf":
                         relative_file_path = (
                             speaker_path / source_presentation.name
                         ).relative_to(self.data_handler.DATA_FOLDER)
-                        self.data_handler.rename(relative_file_path, "presentation.pdf")
+                        await asyncio.to_thread(
+                            self.data_handler.rename,
+                            relative_file_path,
+                            "presentation.pdf",
+                        )
                     presentation_path = speaker_path / "presentation.pdf"
                 elif local_presentation.exists():
                     presentation_path = local_presentation
@@ -215,12 +226,18 @@ class SpeakerManager:
 
                 if source_transcript.exists():
                     progress_callback("Copying transcript...")
-                    self.data_handler.copy(source_transcript, speaker_path)
+                    await asyncio.to_thread(
+                        self.data_handler.copy, source_transcript, speaker_path
+                    )
                     if source_transcript.name != "transcript.pdf":
                         relative_file_path = (
                             speaker_path / source_transcript.name
                         ).relative_to(self.data_handler.DATA_FOLDER)
-                        self.data_handler.rename(relative_file_path, "transcript.pdf")
+                        await asyncio.to_thread(
+                            self.data_handler.rename,
+                            relative_file_path,
+                            "transcript.pdf",
+                        )
                     transcript_path = speaker_path / "transcript.pdf"
                 elif local_transcript.exists():
                     transcript_path = local_transcript
@@ -228,9 +245,6 @@ class SpeakerManager:
                     raise FileNotFoundError(
                         f"Missing transcript file for speaker {speaker.label}"
                     )
-
-                progress_callback("Starting...")
-                await asyncio.sleep(delay)
 
                 from moves_cli.core.components.section_producer import (
                     SectionProducer,
@@ -298,7 +312,9 @@ class SpeakerManager:
                     zip(speakers, speaker_paths)
                 ):
                     task_id = progress.add_task(
-                        description=f"Processing {speaker.label}...", total=None
+                        description=f"Processing {speaker.label}...",
+                        total=None,
+                        start=False,
                     )
                     tasks.append(process_speaker(speaker, speaker_path, idx, task_id))
 
