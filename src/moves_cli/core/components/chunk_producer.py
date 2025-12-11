@@ -35,7 +35,9 @@ def generate_chunks(sections: list[Section], window_size: int) -> list[Chunk]:
         chunks.append(
             Chunk(
                 partial_content=text_normalizer.normalize_text(joined_text),
-                source_sections=list(sections_dict.values()),
+                source_sections=sorted(
+                    sections_dict.values(), key=lambda s: s.section_index
+                ),
                 chunk_id=generate_chunk_id(),
             )
         )
