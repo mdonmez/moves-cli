@@ -16,6 +16,7 @@ class Section:
 class Chunk:
     partial_content: str
     source_sections: list["Section"]
+    chunk_id: str
 
 
 @dataclass

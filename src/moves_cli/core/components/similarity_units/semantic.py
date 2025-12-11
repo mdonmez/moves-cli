@@ -7,7 +7,7 @@ class Semantic:
     def __init__(self, all_chunks: list[Chunk]) -> None:
         from fastembed import TextEmbedding
 
-        self._embeddings: dict[int, np.ndarray] = {}
+        self._embeddings: dict[str, np.ndarray] = {}
 
         self._model = TextEmbedding(
             model_name=EmbeddingModel.name,
@@ -21,7 +21,7 @@ class Semantic:
 
             for chunk, embedding in zip(all_chunks, chunk_embeddings):
                 norm = np.linalg.norm(embedding) or 1.0
-                self._embeddings[id(chunk)] = embedding / norm
+                self._embeddings[chunk.chunk_id] = embedding / norm
 
     def compare(
         self, input_str: str, candidates: list[Chunk]
@@ -34,7 +34,7 @@ class Semantic:
             input_embedding = input_embedding / (np.linalg.norm(input_embedding) or 1.0)
 
             candidate_matrix = np.array(
-                [self._embeddings[id(c)] for c in candidates], dtype=np.float32
+                [self._embeddings[c.chunk_id] for c in candidates], dtype=np.float32
             )
 
             scores = candidate_matrix @ input_embedding

@@ -3,6 +3,7 @@ from collections import defaultdict
 from moves_cli.config import CANDIDATE_RANGE_MAX_OFFSET, CANDIDATE_RANGE_MIN_OFFSET
 from moves_cli.models import Chunk, Section
 from moves_cli.utils import text_normalizer
+from moves_cli.utils.id_generator import generate_chunk_id
 
 
 def generate_chunks(sections: list[Section], window_size: int) -> list[Chunk]:
@@ -35,6 +36,7 @@ def generate_chunks(sections: list[Section], window_size: int) -> list[Chunk]:
             Chunk(
                 partial_content=text_normalizer.normalize_text(joined_text),
                 source_sections=list(sections_dict.values()),
+                chunk_id=generate_chunk_id(),
             )
         )
 

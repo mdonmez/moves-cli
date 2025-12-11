@@ -6,8 +6,8 @@ from moves_cli.models import Chunk, SimilarityResult
 
 class Phonetic:
     def __init__(self, all_chunks: list[Chunk]) -> None:
-        self._phonetic_codes: dict[int, str] = {
-            id(chunk): metaphone(chunk.partial_content).replace(" ", "")
+        self._phonetic_codes: dict[str, str] = {
+            chunk.chunk_id: metaphone(chunk.partial_content).replace(" ", "")
             for chunk in all_chunks
         }
 
@@ -20,7 +20,7 @@ class Phonetic:
         try:
             input_code = metaphone(input_str).replace(" ", "")
 
-            choices = [self._phonetic_codes.get(id(c), "") for c in candidates]
+            choices = [self._phonetic_codes.get(c.chunk_id, "") for c in candidates]
 
             raw_results = process.extract(
                 query=input_code,

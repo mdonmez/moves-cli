@@ -26,8 +26,12 @@ class SimilarityCalculator:
             semantic_results = self.semantic.compare(input_str, candidates)
             phonetic_results = self.phonetic.compare(input_str, candidates)
 
-            phonetic_scores = {id(res.chunk): res.score for res in phonetic_results}
-            semantic_scores = {id(res.chunk): res.score for res in semantic_results}
+            phonetic_scores = {
+                res.chunk.chunk_id: res.score for res in phonetic_results
+            }
+            semantic_scores = {
+                res.chunk.chunk_id: res.score for res in semantic_results
+            }
 
             max_p = max(phonetic_scores.values()) if phonetic_scores else 1.0
             max_s = max(semantic_scores.values()) if semantic_scores else 1.0
@@ -48,8 +52,8 @@ class SimilarityCalculator:
                 SimilarityResult(
                     chunk=candidate,
                     score=(
-                        phonetic_scores.get(id(candidate), 0.0) * factor_p
-                        + semantic_scores.get(id(candidate), 0.0) * factor_s
+                        phonetic_scores.get(candidate.chunk_id, 0.0) * factor_p
+                        + semantic_scores.get(candidate.chunk_id, 0.0) * factor_s
                     ),
                 )
                 for candidate in candidates
