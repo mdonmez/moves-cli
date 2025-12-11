@@ -21,7 +21,7 @@ class DataHandler:
             return self.DATA_FOLDER / path
 
     def write(self, path: Path, data: str) -> bool:
-        full_path = self.DATA_FOLDER / Path(path)
+        full_path = self._resolve_path(path)
         try:
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(data, encoding="utf-8")
@@ -30,7 +30,7 @@ class DataHandler:
             raise RuntimeError(f"Write operation failed for {path}: {e}") from e
 
     def read(self, path: Path) -> str:
-        full_path = self.DATA_FOLDER / Path(path)
+        full_path = self._resolve_path(path)
         if not full_path.exists():
             raise FileNotFoundError(f"File not found: {path}")
         if not full_path.is_file():
@@ -42,7 +42,7 @@ class DataHandler:
             raise RuntimeError(f"Read operation failed for {path}: {e}") from e
 
     def list(self, path: Path) -> list[Path]:
-        full_path = self.DATA_FOLDER / Path(path)
+        full_path = self._resolve_path(path)
         if not full_path.exists():
             return []
 
@@ -55,7 +55,7 @@ class DataHandler:
             raise RuntimeError(f"List operation failed for {path}: {e}") from e
 
     def rename(self, path: Path, new_name: str) -> Path:
-        full_path = self.DATA_FOLDER / Path(path)
+        full_path = self._resolve_path(path)
         target_path = full_path.parent / new_name
 
         try:
@@ -70,7 +70,7 @@ class DataHandler:
             ) from e
 
     def delete(self, path: Path) -> bool:
-        full_path = self.DATA_FOLDER / Path(path)
+        full_path = self._resolve_path(path)
         if not full_path.exists():
             raise FileNotFoundError(f"Path not found: {path}")
 

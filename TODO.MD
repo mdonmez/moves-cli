@@ -71,7 +71,7 @@
   - **Impact**: Section ordering may be mixed up, causing incorrect navigation.
   - **Solution**: Use `sorted(sections_dict.values(), key=lambda s: s.section_index)`.
 
-- [ ] **`data_handler.py` (Lines 24, 33)**: Path concatenation inconsistency
+- [x] **`data_handler.py` (Lines 24, 33)**: Path concatenation inconsistency
 
   - **Issue**: `write()` and `read()` methods use `self.DATA_FOLDER / Path(path)` but don't use the `_resolve_path()` method.
   - **Impact**: Absolute paths may be double-prepended (previously fixed but only for `copy()`).
