@@ -1,7 +1,8 @@
 import asyncio
 import json
-import os
 import signal
+import sys
+import threading
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -173,7 +174,7 @@ class SpeakerManager:
             def sigint_handler(signum, frame):
                 progress.stop()
                 typer.echo("\nCancelled.")
-                os._exit(130)  # 128 + SIGINT(2)
+                sys.exit(130)  # 128 + SIGINT(2)
 
             signal.signal(signal.SIGINT, sigint_handler)
 
@@ -188,7 +189,7 @@ class SpeakerManager:
                 def progress_callback(msg: str):
                     progress.update(
                         task_id,
-                        description=f"Processing {speaker.label}... ({msg})",
+                        description=f"{speaker.label}: {msg}",
                     )
 
                 local_presentation = speaker_path / "presentation.pdf"
@@ -228,6 +229,7 @@ class SpeakerManager:
                         f"Missing transcript file for speaker {speaker.label}"
                     )
 
+                progress_callback("Starting...")
                 await asyncio.sleep(delay)
 
                 from moves_cli.core.components.section_producer import (
@@ -236,15 +238,30 @@ class SpeakerManager:
 
                 section_producer = SectionProducer()
 
-                sections = await asyncio.to_thread(
-                    section_producer.generate_sections,
-                    presentation_path=presentation_path,
-                    transcript_path=transcript_path,
-                    llm_model=llm_model,
-                    llm_api_key=llm_api_key,
-                    callback=progress_callback,
-                )
+                # Run generation in a daemon thread so it doesn't block sys.exit()
+                loop = asyncio.get_running_loop()
+                future = loop.create_future()
 
+                def run_generation():
+                    try:
+                        result = section_producer.generate_sections(
+                            presentation_path=presentation_path,
+                            transcript_path=transcript_path,
+                            llm_model=llm_model,
+                            llm_api_key=llm_api_key,
+                            callback=progress_callback,
+                        )
+                        loop.call_soon_threadsafe(future.set_result, result)
+                    except Exception as e:
+                        loop.call_soon_threadsafe(future.set_exception, e)
+
+                # Daemon thread dies when main process exits
+                thread = threading.Thread(target=run_generation, daemon=True)
+                thread.start()
+
+                sections = await future
+
+                progress_callback("Writing to file...")
                 self.data_handler.write(
                     speaker_path / "sections.json",
                     json.dumps(section_producer.convert_to_list(sections), indent=2),

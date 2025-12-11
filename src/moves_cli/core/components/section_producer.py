@@ -112,15 +112,15 @@ class SectionProducer:
         callback: Callable[[str], None] | None = None,
     ) -> list[Section]:
         if callback:
-            callback("Extracting presentation PDF...")
+            callback("Extracting data...")
         presentation_data = self._extract_pdf(presentation_path, "presentation")
 
         if callback:
-            callback("Extracting transcript PDF...")
+            callback("Extracting data...")
         transcript_data = self._extract_pdf(transcript_path, "transcript")
 
         if callback:
-            callback("Querying LLM model (this may take a while)...")
+            callback("Calling LLM...")
         section_contents = self._call_llm(
             presentation_data=presentation_data,
             transcript_data=transcript_data,

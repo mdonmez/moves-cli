@@ -57,9 +57,11 @@ class PresentationController:
 
         self.window_size = window_size
         self.sections = sections
-        self.current_section = sections[0]
         self.section_lock = threading.Lock()
         self.shutdown_flag = threading.Event()
+
+        with self.section_lock:
+            self.current_section = sections[0]
 
         self.audio_queue = Queue(maxsize=PresentationController.AUDIO_QUEUE_SIZE)
         self.words_queue = Queue(maxsize=PresentationController.WORDS_QUEUE_SIZE)

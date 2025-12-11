@@ -46,13 +46,13 @@
 
 ### MEDIUM: Concurrency and Thread Safety Issues
 
-- [ ] **`presentation_controller.py` (Lines 59-64)**: Race condition risk for `current_section` and queues
+- [x] **`presentation_controller.py` (Lines 59-64)**: Race condition risk for `current_section` and queues
 
   - **Issue**: `self.current_section` is only protected by `section_lock` but the initial assignment (line 59) is outside the lock.
   - **Impact**: Race condition may occur during initial section assignment in multi-threaded environment.
   - **Solution**: Perform initial assignment inside the lock or before starting threads in `__init__`.
 
-- [ ] **`presentation_controller.py` (Lines 86-110)**: Error information lost in exception handling with shutdown_flag
+- [x] **`presentation_controller.py` (Lines 86-110)**: Error information lost in exception handling with shutdown_flag
 
   - **Issue**: In `except Exception:` block, only `shutdown_flag.set()` is called, error is not logged or reported to user.
   - **Impact**: Silent failures, debugging becomes difficult.
