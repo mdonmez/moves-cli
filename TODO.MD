@@ -58,7 +58,7 @@
   - **Impact**: Silent failures, debugging becomes difficult.
   - **Solution**: At minimum, write error to stderr or add logging.
 
-- [ ] **`speaker_manager.py` (Lines 170-178)**: Use of `os._exit()` in SIGINT handler
+- [x] **`speaker_manager.py` (Lines 170-178)**: Use of `os._exit()` in SIGINT handler
   - **Issue**: `os._exit()` exits without cleanup, files may not be properly closed.
   - **Impact**: Risk of data loss, especially during write operations.
   - **Solution**: Use `sys.exit()` or add graceful shutdown mechanism.
