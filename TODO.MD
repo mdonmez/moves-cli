@@ -177,4 +177,4 @@ _(Array indexing like `sections[0]` remains correct, accessing the first section
 
 - [x] +3 -2 instead of -3 +2
 
-- [ ] Move the ID generation logics from inline codes to the models' itself for more centralized and maintainable code, while still keeping the id generation utility.
+- [x] ~~Move the ID generation logics from inline codes to the models' itself for more centralized and maintainable code, while still keeping the id generation utility.~~ — Do better SOLID alternative instead, DI-based chunk ID generation.
