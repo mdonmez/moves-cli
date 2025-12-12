@@ -33,13 +33,9 @@ class SimilarityCalculator:
                 res.chunk.chunk_id: res.score for res in semantic_results
             }
 
-            max_p = max(phonetic_scores.values()) if phonetic_scores else 1.0
-            max_s = max(semantic_scores.values()) if semantic_scores else 1.0
-
-            if max_p == 0:
-                max_p = 1.0
-            if max_s == 0:
-                max_s = 1.0
+            # Use 1.0 if dict is empty or all scores are 0 (prevents division by zero)
+            max_p = max(phonetic_scores.values(), default=0.0) or 1.0
+            max_s = max(semantic_scores.values(), default=0.0) or 1.0
 
             batch_quality = (self.phonetic_weight * max_p) + (
                 self.semantic_weight * max_s
