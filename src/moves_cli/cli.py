@@ -178,15 +178,8 @@ def speaker_list():
 
         id_width = max(max(len(s.speaker_id) for s in speakers), len("ID"))
         name_width = max(max(len(s.name) for s in speakers), len("NAME"))
-        # Calculate max width for date, defaulting to header length if no dates
-        date_lens = [
-            len(datetime.fromisoformat(s.last_processed).strftime("%Y-%m-%d %H:%M"))
-            for s in speakers
-            if s.last_processed
-        ]
-        last_processed_width = max(
-            (max(date_lens) if date_lens else 0), len(last_processed_header)
-        )
+        # Date format "YYYY-MM-DD HH:MM" is always 16 chars
+        last_processed_width = max(16, len(last_processed_header))
         status_width = max(len("Not Ready"), len("STATUS"))
 
         typer.echo(f"Registered Speakers ({len(speakers)})")
