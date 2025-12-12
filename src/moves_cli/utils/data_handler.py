@@ -59,8 +59,8 @@ class DataHandler:
         target_path = full_path.parent / new_name
 
         try:
-            if target_path.exists():
-                target_path.unlink()
+            # Delete target if it exists (missing_ok=True prevents race condition)
+            target_path.unlink(missing_ok=True)
 
             moved_path = shutil.move(str(full_path), str(target_path))
             return Path(moved_path).relative_to(self.DATA_FOLDER)
