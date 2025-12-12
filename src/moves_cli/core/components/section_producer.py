@@ -46,6 +46,8 @@ class SectionProducer:
         llm_model: str,
         llm_api_key: str,
     ) -> list[str]:
+        slide_count = len(presentation_data.split("\n\n"))
+
         class SectionsOutputModel(BaseModel):
             class SectionItem(BaseModel):
                 section_index: int = Field(
@@ -56,8 +58,8 @@ class SectionProducer:
             sections: list[SectionItem] = Field(  # type: ignore
                 ...,
                 description="List of section items, one for each slide",
-                min_items=len(presentation_data.split("\n\n")),
-                max_items=len(presentation_data.split("\n\n")),
+                min_items=slide_count,
+                max_items=slide_count,
             )
 
         try:
