@@ -3,6 +3,8 @@ import unicodedata
 
 from num2words import num2words
 
+from moves_cli.models import NormalizationMode
+
 RE_DIACRITICS = re.compile(r"[\u0300-\u036f]")
 
 RE_EMOJI = re.compile(
@@ -32,7 +34,14 @@ QUOTE_TRANS_TABLE = str.maketrans(
 )
 
 
-def normalize_text(text: str) -> str:
+def _convert_number(match: re.Match) -> str:
+    try:
+        return num2words(match.group(0)).replace("-", " ")
+    except Exception:
+        return match.group(0)
+
+
+def normalize_text(text: str, mode: NormalizationMode = NormalizationMode.LIVE) -> str:
     if not text:
         return ""
 
@@ -44,8 +53,8 @@ def normalize_text(text: str) -> str:
 
     text = text.translate(QUOTE_TRANS_TABLE)
 
-    if RE_DIGITS.search(text):
-        text = RE_DIGITS.sub(lambda m: num2words(m.group(0)).replace("-", " "), text)
+    if mode == NormalizationMode.PREPROCESS and RE_DIGITS.search(text):
+        text = RE_DIGITS.sub(_convert_number, text)
 
     text = RE_SPECIAL_CHARS.sub(" ", text)
 
