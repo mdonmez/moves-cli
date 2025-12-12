@@ -15,4 +15,4 @@ CANDIDATE_RANGE_MAX_OFFSET: int = 2
 
 # Default settings (used by SettingsEditor)
 DEFAULT_LLM_MODEL: str = "gemini/gemini-2.5-flash-lite"
-DEFAULT_API_KEY: str | None = None
+DEFAULT_API_KEY: str = ""  # Empty string (TOML doesn't support null)

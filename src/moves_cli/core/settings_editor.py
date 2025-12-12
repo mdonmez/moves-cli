@@ -12,7 +12,6 @@ class SettingsEditor:
         self.data_handler = data_handler
         self.settings = self.data_handler.DATA_FOLDER / "settings.toml"
 
-        # Define template defaults from config constants
         self._template_defaults: dict[str, Any] = {
             "model": DEFAULT_LLM_MODEL,
             "key": DEFAULT_API_KEY,
@@ -31,11 +30,24 @@ class SettingsEditor:
         try:
             self.settings.parent.mkdir(parents=True, exist_ok=True)
 
-            # Create a new tomlkit document with current data
             doc = tomlkit.document()
+
+            doc.add(tomlkit.comment("moves CLI Configuration"))
+
+            doc.add(tomlkit.nl())
+
             for key in self._template_defaults.keys():
-                if key in self._data:
-                    doc[key] = self._data[key]
+                if key == "model":
+                    doc.add(
+                        tomlkit.comment(
+                            "LLM model for speaker processing, find models at: https://models.litellm.ai/"
+                        )
+                    )
+                elif key == "key":
+                    doc.add(tomlkit.comment("API key for the LLM provider"))
+
+                value = self._data.get(key)
+                doc[key] = value if value is not None else ""
 
             with self.settings.open("w", encoding="utf-8") as f:
                 f.write(tomlkit.dumps(doc))
@@ -67,4 +79,7 @@ class SettingsEditor:
             raise RuntimeError(f"Failed to unset key '{key}': {e}") from e
 
     def list(self) -> Settings:
-        return Settings(**self._data)
+        return Settings(
+            model=self._data.get("model") or None,
+            key=self._data.get("key") or None,
+        )
