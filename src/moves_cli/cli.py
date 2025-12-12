@@ -292,17 +292,17 @@ def speaker_process(
         # Resolve speakers
         if all:
             # Get all speakers
-            speaker_list = speaker_manager.list()
-            if not speaker_list:
+            resolved_speakers = speaker_manager.list()
+            if not resolved_speakers:
                 typer.echo("No speakers found to process.")
                 return
         elif speakers:
             # Resolve each speaker from the list
-            speaker_list = []
+            resolved_speakers = []
 
-            for speaker_name in speakers:
-                resolved = speaker_manager.resolve(speaker_name)
-                speaker_list.append(resolved)
+            for pattern in speakers:
+                resolved = speaker_manager.resolve(pattern)
+                resolved_speakers.append(resolved)
         else:
             typer.echo(
                 "Error: Either provide speaker names or use --all to process all speakers.",
@@ -311,34 +311,34 @@ def speaker_process(
             raise typer.Exit(1)
 
         # Display processing message
-        if len(speaker_list) == 1:
-            typer.echo(f"Processing speaker {speaker_list[0].label}...")
+        if len(resolved_speakers) == 1:
+            typer.echo(f"Processing speaker {resolved_speakers[0].label}...")
         else:
-            typer.echo(f"Processing {len(speaker_list)} speakers...")
+            typer.echo(f"Processing {len(resolved_speakers)} speakers...")
 
         # Call speaker_manager.process with resolved speakers
         results = asyncio.run(
             speaker_manager.process(
-                speaker_list, settings.model, settings.key, skip_confirmation=yes
+                resolved_speakers, settings.model, settings.key, skip_confirmation=yes
             )
         )
 
         # Display results in Direct Summary format
-        if len(speaker_list) == 1:
+        if len(resolved_speakers) == 1:
             result = results[0]
-            speaker = speaker_list[0]
+            speaker = resolved_speakers[0]
             typer.echo(f"Speaker {speaker.label} processed.")
             typer.echo(f"{result.section_count} sections have been created.")
             typer.echo(
                 f"The processing time took {result.processing_time_seconds:.1f} seconds."
             )
         else:
-            typer.echo(f"{len(speaker_list)} speakers processed.")
+            typer.echo(f"{len(resolved_speakers)} speakers processed.")
 
             # Display detailed results for all speakers
             total_time = sum(result.processing_time_seconds for result in results)
             for i, result in enumerate(results):
-                speaker = speaker_list[i]
+                speaker = resolved_speakers[i]
                 typer.echo(
                     f"{speaker.label} -> {result.section_count} sections ({result.processing_time_seconds:.1f}s)"
                 )
@@ -369,17 +369,17 @@ def speaker_delete(
         # Resolve speakers
         if all:
             # Get all speakers
-            speaker_list = speaker_manager.list()
-            if not speaker_list:
+            resolved_speakers = speaker_manager.list()
+            if not resolved_speakers:
                 typer.echo("No speakers found to delete.")
                 return
         elif speakers:
             # Resolve each speaker from the list
-            speaker_list = []
+            resolved_speakers = []
 
-            for speaker_name in speakers:
-                resolved = speaker_manager.resolve(speaker_name)
-                speaker_list.append(resolved)
+            for pattern in speakers:
+                resolved = speaker_manager.resolve(pattern)
+                resolved_speakers.append(resolved)
         else:
             typer.echo(
                 "Error: Either provide speaker names or use --all to delete all speakers.",
@@ -389,9 +389,9 @@ def speaker_delete(
 
         # Display deletion plan
         typer.echo(
-            f"Are you sure you want to delete the following {len(speaker_list)} speaker(s)?"
+            f"Are you sure you want to delete the following {len(resolved_speakers)} speaker(s)?"
         )
-        for speaker in speaker_list:
+        for speaker in resolved_speakers:
             typer.echo(f"    {speaker.label}")
         typer.echo()
 
@@ -401,13 +401,13 @@ def speaker_delete(
             typer.echo()
 
         # Display deletion message
-        typer.echo(f"Deleting {len(speaker_list)} speaker(s)...\n")
+        typer.echo(f"Deleting {len(resolved_speakers)} speaker(s)...\n")
 
         # Delete speakers using for loop and display results immediately
         deleted_count = 0
         failed_count = 0
 
-        for speaker in speaker_list:
+        for speaker in resolved_speakers:
             success = speaker_manager.delete(speaker)
             if success:
                 typer.echo(f"Speaker {speaker.label} deleted.")
