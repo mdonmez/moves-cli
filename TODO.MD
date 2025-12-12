@@ -77,79 +77,85 @@
   - **Impact**: Absolute paths may be double-prepended (previously fixed but only for `copy()`).
   - **Solution**: Use `_resolve_path()` in all methods.
 
-- [ ] **`speaker_manager.py` (Lines 43-46)**: Insufficient name and ID collision check
+- [x] **`speaker_manager.py` (Lines 43-46)**: Insufficient name and ID collision check
   - **Issue**: Only checking `name in speaker_ids` but should also check the generated `speaker_id` value.
   - **Impact**: Very low probability but if the same ID is generated, data could be overwritten.
   - **Solution**: Check that the generated `speaker_id` doesn't conflict with existing IDs, add retry if needed.
 
 ### MEDIUM: Resource Management and Performance
 
-- [ ] **`presentation_controller.py` (Line 41)**: Model download with `asyncio.run()` on every `__init__` call
+- [ ] ~~**`presentation_controller.py` (Line 41)**: Model download with `asyncio.run()` on every `__init__` call~~
 
-  - **Issue**: Model download check is performed every time `PresentationController` is created, this is a blocking operation.
-  - **Impact**: UI freeze, unnecessary network checks.
-  - **Solution**: Perform model preparation once at CLI level, or use lazy loading.
+  - ~~**Issue**: Model download check is performed every time `PresentationController` is created, this is a blocking operation.~~
+  - ~~**Impact**: UI freeze, unnecessary network checks.~~
+  - ~~**Solution**: Perform model preparation once at CLI level, or use lazy loading.~~
+  - **Not an issue**: Model preparer already has excellent caching - it verifies checksums (~50-100ms) and returns immediately if files are valid. No network calls after initial download.
 
-- [ ] **`semantic.py` (Lines 8-15)**: `TextEmbedding` model reloaded for each Semantic instance
+- [ ] ~~**`semantic.py` (Lines 8-15)**: `TextEmbedding` model reloaded for each Semantic instance~~
 
-  - **Issue**: Model is reloaded every time a new `SimilarityCalculator` is created for each speaker.
-  - **Impact**: Memory waste, slow startup.
-  - **Solution**: Share the model using singleton pattern or dependency injection.
+  - ~~**Issue**: Model is reloaded every time a new `SimilarityCalculator` is created for each speaker.~~
+  - ~~**Impact**: Memory waste, slow startup.~~
+  - ~~**Solution**: Share the model using singleton pattern or dependency injection.~~
+  - **Not an issue**: Each presentation control session is a separate CLI process. The model loads once per session and memory is freed when the process exits. Different speakers = different processes, no memory waste.
 
-- [ ] **`model_preparer.py` (Lines 64-71)**: Race condition during empty directory cleanup
-  - **Issue**: While traversing directory tree with `os.walk()`, another process could create files.
-  - **Impact**: `OSError` or incomplete cleanup.
-  - **Solution**: Exception handling already exists but could be made more robust.
+- [ ] ~~**`model_preparer.py` (Lines 64-71)**: Race condition during empty directory cleanup~~
+  - ~~**Issue**: While traversing directory tree with `os.walk()`, another process could create files.~~
+  - ~~**Impact**: `OSError` or incomplete cleanup.~~
+  - ~~**Solution**: Exception handling already exists but could be made more robust.~~
+  - **Not an issue**: Exception handling is already appropriate. All `OSError` cases (directory not empty, already deleted, permission denied) are safe to ignore. Cleanup is non-critical and self-healing - missed items get cleaned up next time. Over-engineering to make this "more robust".
 
 ### LOW: Code Quality and Maintainability
 
-- [ ] **`similarity_calculator.py` (Lines 32-38)**: Redundant `if max_p == 0` check
+- [x] **`similarity_calculator.py` (Lines 32-38)**: Redundant `if max_p == 0` check
 
   - **Issue**: Lines 32-33 already assign 1.0 if `max()` result is 0, then check again.
   - **Impact**: Code duplication, reduced readability.
   - **Solution**: Remove second check or combine: `max_p = max(phonetic_scores.values()) if phonetic_scores else 1.0; max_p = max_p or 1.0`
 
-- [ ] **`text_normalizer.py` (Line 48)**: No exception handling for `num2words()`
+- [x] **`text_normalizer.py` (Line 48)**: No exception handling for `num2words()`
 
   - **Issue**: `num2words()` may fail for very large numbers or special formats.
   - **Impact**: Text normalization fails, affecting entire pipeline.
   - **Solution**: Add try-except, keep original number on error.
+  - **Fixed**: Added `NormalizationMode` enum (LIVE/PREPROCESS). LIVE mode skips num2words entirely for live speech. PREPROCESS mode includes exception handling with fallback.
 
-- [ ] **`section_producer.py` (Lines 59-60)**: LLM validation constraints calculated at runtime
+- [x] **`section_producer.py` (Lines 59-60)**: LLM validation constraints calculated at runtime
 
   - **Issue**: `min_items` and `max_items` are recalculated on every LLM call.
   - **Impact**: Not a performance loss but code smell.
   - **Solution**: Calculate slide count beforehand and pass as parameter.
 
-- [ ] **`cli.py` (Lines 183-189)**: Complex list comprehension with datetime parsing
+- [x] **`cli.py` (Lines 183-189)**: Complex list comprehension with datetime parsing
 
   - **Issue**: Low readability, difficult error handling.
   - **Impact**: Maintenance difficulty.
   - **Solution**: Extract to helper function.
+  - **Fixed**: Replaced with constant width (16 chars for "YYYY-MM-DD HH:MM" format). Simpler, faster, no crash risk.
 
-- [ ] **`speaker_manager.py` (Lines 307-308)**: Inconsistent variable naming
+- [x] **`speaker_manager.py` (Lines 307-308)**: Inconsistent variable naming
   - **Issue**: `speaker_list` used as both input parameter and local variable.
   - **Impact**: Confusion, potential bug.
   - **Solution**: Use more descriptive name like `resolved_speakers`.
 
 ### LOW: Type Safety and Validation
 
-- [ ] **`models.py` (Lines 16-18)**: `Chunk` is frozen but `source_sections` is mutable list
+- [x] **`models.py` (Lines 16-18)**: `Chunk` is frozen but `source_sections` is mutable list
 
   - **Issue**: Despite `frozen=True`, list contents can be modified.
   - **Impact**: Immutability guarantee is broken.
   - **Solution**: Use `source_sections: tuple[Section, ...]` or convert to tuple in `__post_init__`.
 
-- [ ] **`data_handler.py` (Lines 62-63)**: Unlink after target_path.exists() check in `rename()` method
+- [x] **`data_handler.py` (Lines 62-63)**: Unlink after target_path.exists() check in `rename()` method
 
   - **Issue**: Race condition - another process could delete the file between exists check and unlink.
   - **Impact**: `FileNotFoundError` may occur.
   - **Solution**: `missing_ok=True` parameter already exists but not used in `unlink()` call.
 
-- [ ] **`settings_editor.py` (Lines 22-24)**: Exception catching too broad
+- ~~**`settings_editor.py` (Lines 22-24)**: Exception catching too broad~~ **Not an issue**
   - **Issue**: `except Exception:` catches all errors, no specific error handling.
   - **Impact**: Debugging becomes difficult, different errors handled the same way.
   - **Solution**: Separate specific exceptions like `FileNotFoundError`, `tomlkit.exceptions.ParseError`.
+  - **Analysis**: The broad exception is **intentional** - settings file is self-repairing. If corrupted or missing, it automatically resets to defaults and saves. This is better UX than crashing.
 
 ### Priority Ranking
 
