@@ -152,14 +152,23 @@
   - **Solution**: `missing_ok=True` parameter already exists but not used in `unlink()` call.
 
 - ~~**`settings_editor.py` (Lines 22-24)**: Exception catching too broad~~ **Not an issue**
+
   - **Issue**: `except Exception:` catches all errors, no specific error handling.
   - **Impact**: Debugging becomes difficult, different errors handled the same way.
   - **Solution**: Separate specific exceptions like `FileNotFoundError`, `tomlkit.exceptions.ParseError`.
   - **Analysis**: The broad exception is **intentional** - settings file is self-repairing. If corrupted or missing, it automatically resets to defaults and saves. This is better UX than crashing.
 
-### Priority Ranking
+- [x] Fix alignment while creating sections and starting live presentation control, sections must start start from 1—not 0—and the presentation control must start from the first section [0], so 1. This reflects the real-world presentation order and scenario.
 
-1. **HIGHEST PRIORITY**: ID usage issues (phonetic.py, semantic.py, similarity_calculator.py)
-2. **HIGH**: Thread safety and exception handling (presentation_controller.py, speaker_manager.py)
-3. **MEDIUM**: Data consistency (chunk_producer.py, data_handler.py)
-4. **LOW**: Code quality and refactoring (others)
+**Issue:** Section indexing is currently 0-based (`section_index` starts at 0), causing inconsistency with real-world 1-based presentation numbering and requiring manual adjustments for user displays.
+
+**Goal:** Standardize `section_index` to be 1-based throughout the system.
+
+**Proposed Changes:**
+
+1.  **`section_producer.py` (Line 32):** Update PDF slide labeling: Change `f"# Slide Page {i}"` to `f"# Slide Page {i + 1}"`.
+2.  **`section_producer.py` (Lines 53-55):** Update LLM schema constraint: Change `ge=0` to `ge=1` (Index starting from 1).
+3.  **`section_producer.py` (Line 138):** Adjust section creation: Change `section_index=idx` to `section_index=idx + 1`.
+4.  **`presentation_controller.py` (Line 149):** Update status display: Remove manual adjustment, changing `current_section.section_index + 1` to `current_section.section_index`.
+
+_(Array indexing like `sections[0]` remains correct, accessing the first section which now holds a `section_index` of 1.)_

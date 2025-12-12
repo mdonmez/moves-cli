@@ -145,9 +145,7 @@ class PresentationController:
                     target_section.section_index - current_section.section_index
                 )
 
-                slide_position = (
-                    f"{current_section.section_index + 1}/{len(self.sections)}"
-                )
+                slide_position = f"{current_section.section_index}/{len(self.sections)}"
                 similarity_pct = f"%{int(top_match.score * 100)}"
 
                 match (top_match.score >= self.SIMILARITY_THRESHOLD, slide_delta):

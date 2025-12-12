@@ -29,7 +29,7 @@ class SectionProducer:
                             page_text = page.get_text("text")
                             cleaned_text = " ".join(page_text.split())
                             markdown_sections.append(
-                                f"# Slide Page {i}\n{cleaned_text}"
+                                f"# Slide Page {i + 1}\n{cleaned_text}"
                             )
                             slide_count += 1
 
@@ -51,7 +51,7 @@ class SectionProducer:
         class SectionsOutputModel(BaseModel):
             class SectionItem(BaseModel):
                 section_index: int = Field(
-                    ..., ge=0, description="Index starting from 0"
+                    ..., ge=1, description="Index starting from 1"
                 )
                 content: str = Field(..., description="Content of the section")
 
@@ -135,7 +135,7 @@ class SectionProducer:
         for idx, content in enumerate(section_contents):
             section = Section(
                 content=content,
-                section_index=idx,
+                section_index=idx + 1,
             )
             generated_sections.append(section)
 
