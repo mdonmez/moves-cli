@@ -24,7 +24,9 @@ class Section:
 @dataclass(frozen=True)
 class Chunk:
     partial_content: str
-    source_sections: list["Section"]
+    source_sections: tuple[
+        Section, ...
+    ]  # Tuple ensures true immutability (frozen=True only prevents reassignment), this is why we use tuple instead of list
     chunk_id: str
 
 
