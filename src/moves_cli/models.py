@@ -1,7 +1,16 @@
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from moves_cli.config import DATA_FOLDER
+
+
+class NormalizationMode(StrEnum):
+    """Text normalization mode for different use cases."""
+
+    LIVE = "live"  # Fast path: skip num2words (STT outputs words)
+    PREPROCESS = "preprocess"  # Full normalization with num2words
+
 
 SpeakerId = str
 
