@@ -41,12 +41,28 @@ class SpeakerManager:
         current_speakers = self.list()
         speaker_ids = [speaker.speaker_id for speaker in current_speakers]
 
+        # Check 1: Prevent name collision with existing IDs (security/UX)
         if name in speaker_ids:
             raise ValueError(
-                f"Given name '{name}' can't be a same with one of the existing speakers' IDs."
+                f"Speaker name '{name}' conflicts with an existing speaker ID. "
+                f"Please choose a different name."
             )
 
-        speaker_id = id_generator.generate_speaker_id(name)
+        # Check 2: Generate unique speaker ID with collision detection
+        max_retries = 3
+        speaker_id = None
+        for attempt in range(max_retries):
+            candidate_id = id_generator.generate_speaker_id(name)
+            if candidate_id not in speaker_ids:
+                speaker_id = candidate_id
+                break
+        
+        if speaker_id is None:
+            raise RuntimeError(
+                f"Failed to generate unique speaker ID after {max_retries} attempts. "
+                f"This is extremely rare - please try again."
+            )
+
         speaker_path = self.SPEAKERS_PATH / speaker_id
         speaker = Speaker(
             name=name,
