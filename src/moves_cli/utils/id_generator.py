@@ -4,14 +4,12 @@ import secrets
 from fastnanoid import generate
 from unidecode import unidecode
 
-from moves_cli.models import SpeakerId
-
 
 def generate_chunk_id() -> str:
     return generate()
 
 
-def generate_speaker_id(name: str) -> SpeakerId:
+def generate_speaker_id(name: str) -> str:
     ascii_name = unidecode(name)
 
     slug = (

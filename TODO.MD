@@ -175,4 +175,6 @@ _(Array indexing like `sections[0]` remains correct, accessing the first section
 
 - [x] Fix non %100 and always highest is %99 issue with threshold alignment
 
-- [ ] +3 -2 instead of -3 +2
+- [x] +3 -2 instead of -3 +2
+
+- [ ] Move the ID generation logics from inline codes to the models' itself for more centralized and maintainable code, while still keeping the id generation utility.

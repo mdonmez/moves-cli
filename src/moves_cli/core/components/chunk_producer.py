@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Callable
 
 from moves_cli.config import CANDIDATE_RANGE_MAX_OFFSET, CANDIDATE_RANGE_MIN_OFFSET
 from moves_cli.models import Chunk, NormalizationMode, Section
@@ -6,7 +7,11 @@ from moves_cli.utils import text_normalizer
 from moves_cli.utils.id_generator import generate_chunk_id
 
 
-def generate_chunks(sections: list[Section], window_size: int) -> list[Chunk]:
+def generate_chunks(
+    sections: list[Section],
+    window_size: int,
+    chunk_id_generator: Callable[[], str] = generate_chunk_id,
+) -> list[Chunk]:
     if window_size < 1:
         return []
 
@@ -40,7 +45,7 @@ def generate_chunks(sections: list[Section], window_size: int) -> list[Chunk]:
                 source_sections=tuple(
                     sorted(sections_dict.values(), key=lambda s: s.section_index)
                 ),
-                chunk_id=generate_chunk_id(),
+                chunk_id=chunk_id_generator(),
             )
         )
 

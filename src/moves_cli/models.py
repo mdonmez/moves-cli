@@ -12,9 +12,6 @@ class NormalizationMode(StrEnum):
     PREPROCESS = "preprocess"  # Full normalization with num2words
 
 
-SpeakerId = str
-
-
 @dataclass(frozen=True)
 class Section:
     content: str
@@ -33,7 +30,7 @@ class Chunk:
 @dataclass
 class Speaker:
     name: str
-    speaker_id: SpeakerId
+    speaker_id: str
     source_presentation: Path
     source_transcript: Path
     last_processed: str | None = None
@@ -58,7 +55,7 @@ class Settings:
 @dataclass(frozen=True)
 class ProcessResult:
     section_count: int
-    speaker_id: SpeakerId
+    speaker_id: str
     processing_time_seconds: float
 
 
