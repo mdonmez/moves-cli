@@ -44,16 +44,21 @@ class SimilarityCalculator:
             factor_p = (self.phonetic_weight * batch_quality) / max_p
             factor_s = (self.semantic_weight * batch_quality) / max_s
 
-            final_results = [
-                SimilarityResult(
-                    chunk=candidate,
-                    score=(
-                        phonetic_scores.get(candidate.chunk_id, 0.0) * factor_p
-                        + semantic_scores.get(candidate.chunk_id, 0.0) * factor_s
-                    ),
+            final_results = []
+            for candidate in candidates:
+                raw_score = (
+                    phonetic_scores.get(candidate.chunk_id, 0.0) * factor_p
+                    + semantic_scores.get(candidate.chunk_id, 0.0) * factor_s
                 )
-                for candidate in candidates
-            ]
+
+                if raw_score >= 0.995:
+                    final_score = 1.0
+                else:
+                    final_score = min(1.0, raw_score)
+
+                final_results.append(
+                    SimilarityResult(chunk=candidate, score=final_score)
+                )
 
             final_results.sort(key=lambda x: x.score, reverse=True)
 

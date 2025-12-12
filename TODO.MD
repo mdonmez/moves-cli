@@ -172,3 +172,5 @@
 4.  **`presentation_controller.py` (Line 149):** Update status display: Remove manual adjustment, changing `current_section.section_index + 1` to `current_section.section_index`.
 
 _(Array indexing like `sections[0]` remains correct, accessing the first section which now holds a `section_index` of 1.)_
+
+- [x] Fix non %100 and always highest is %99 issue with threshold alignment
