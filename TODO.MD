@@ -174,3 +174,5 @@
 _(Array indexing like `sections[0]` remains correct, accessing the first section which now holds a `section_index` of 1.)_
 
 - [x] Fix non %100 and always highest is %99 issue with threshold alignment
+
+- [ ] +3 -2 instead of -3 +2
