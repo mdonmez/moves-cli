@@ -20,6 +20,7 @@ from rich.text import Text
 from moves_cli.models import ProcessResult, Speaker
 from moves_cli.utils import id_generator
 from moves_cli.utils.data_handler import DataHandler
+from moves_cli.utils.output_formatter import output
 
 
 class MsecondsElapsedColumn(ProgressColumn):
@@ -56,7 +57,7 @@ class SpeakerManager:
             if candidate_id not in speaker_ids:
                 speaker_id = candidate_id
                 break
-        
+
         if speaker_id is None:
             raise RuntimeError(
                 f"Failed to generate unique speaker ID after {max_retries} attempts. "
@@ -132,13 +133,14 @@ class SpeakerManager:
             self.SPEAKERS_PATH / speaker.speaker_id for speaker in speakers
         ]
 
-        typer.echo(f"Processing Plan for {len(speakers)} speaker(s):\n")
+        typer.echo(f"Processing {len(speakers)} speaker(s).")
+        typer.echo()
 
         for speaker, speaker_path in zip(speakers, speaker_paths):
             source_presentation = speaker.source_presentation
             source_transcript = speaker.source_transcript
-            local_presentation = speaker_path / "presentation.pdf"
-            local_transcript = speaker_path / "transcript.pdf"
+            backup_presentation = speaker_path / "presentation.pdf"
+            backup_transcript = speaker_path / "transcript.pdf"
 
             presentation_from = None
             transcript_from = None
@@ -146,9 +148,9 @@ class SpeakerManager:
             if source_presentation.exists():
                 presentation_from = "SOURCE"
                 pres_path_display = source_presentation
-            elif local_presentation.exists():
-                presentation_from = "LOCAL"
-                pres_path_display = local_presentation
+            elif backup_presentation.exists():
+                presentation_from = "BACKUP"
+                pres_path_display = backup_presentation
             else:
                 raise FileNotFoundError(
                     f"Missing presentation file for speaker {speaker.label}"
@@ -157,24 +159,29 @@ class SpeakerManager:
             if source_transcript.exists():
                 transcript_from = "SOURCE"
                 trans_path_display = source_transcript
-            elif local_transcript.exists():
-                transcript_from = "LOCAL"
-                trans_path_display = local_transcript
+            elif backup_transcript.exists():
+                transcript_from = "BACKUP"
+                trans_path_display = backup_transcript
             else:
                 raise FileNotFoundError(
                     f"Missing transcript file for speaker {speaker.label}"
                 )
 
-            typer.echo(speaker.label)
-            typer.echo(f"    Presentation ({presentation_from}) -> {pres_path_display}")
-            typer.echo(f"    Transcript ({transcript_from}) -> {trans_path_display}")
-            typer.echo()
+            typer.echo(
+                output(
+                    speaker.label,
+                    {
+                        f"Presentation ({presentation_from})": pres_path_display,
+                        f"Transcript ({transcript_from})": trans_path_display,
+                    },
+                )
+            )
 
         typer.echo()
 
         if not skip_confirmation:
-            typer.confirm("Do you want to proceed?", default=True, abort=True)
-            typer.echo("Yes")
+            typer.confirm("Proceed?", default=True, abort=True)
+            # typer.echo("Yes") # User example seems to imply input echo, but usually cleaner without manual echo if tool handles it
             typer.echo()
 
         # Use rich progress for dynamic feedback
@@ -213,8 +220,8 @@ class SpeakerManager:
                 start_time = time.perf_counter()
                 progress_callback("Starting...")
 
-                local_presentation = speaker_path / "presentation.pdf"
-                local_transcript = speaker_path / "transcript.pdf"
+                backup_presentation = speaker_path / "presentation.pdf"
+                backup_transcript = speaker_path / "transcript.pdf"
 
                 presentation_path, transcript_path = None, None
 
@@ -233,8 +240,8 @@ class SpeakerManager:
                             "presentation.pdf",
                         )
                     presentation_path = speaker_path / "presentation.pdf"
-                elif local_presentation.exists():
-                    presentation_path = local_presentation
+                elif backup_presentation.exists():
+                    presentation_path = backup_presentation
                 else:
                     raise FileNotFoundError(
                         f"Missing presentation file for speaker {speaker.label}"
@@ -255,8 +262,8 @@ class SpeakerManager:
                             "transcript.pdf",
                         )
                     transcript_path = speaker_path / "transcript.pdf"
-                elif local_transcript.exists():
-                    transcript_path = local_transcript
+                elif backup_transcript.exists():
+                    transcript_path = backup_transcript
                 else:
                     raise FileNotFoundError(
                         f"Missing transcript file for speaker {speaker.label}"
