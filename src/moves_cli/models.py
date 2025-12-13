@@ -37,7 +37,7 @@ class Speaker:
 
     @property
     def label(self) -> str:
-        return f"'{self.name}' ({self.speaker_id})"
+        return f"{self.name} ({self.speaker_id})"
 
 
 @dataclass(frozen=True)
