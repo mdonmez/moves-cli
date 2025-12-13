@@ -178,3 +178,5 @@ _(Array indexing like `sections[0]` remains correct, accessing the first section
 - [x] +3 -2 instead of -3 +2
 
 - [x] ~~Move the ID generation logics from inline codes to the models' itself for more centralized and maintainable code, while still keeping the id generation utility.~~ — Do better SOLID alternative instead, DI-based chunk ID generation.
+
+- [x] Refine and unify the CLI output function to handle text, key-value pairs, and tables consistently across the application, replacing scattered `typer.echo` formatting with a centralized `output` utility using `rich`.
