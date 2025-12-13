@@ -8,6 +8,7 @@ import typer
 from moves_cli.config import DEFAULT_API_KEY, DEFAULT_LLM_MODEL, WINDOW_SIZE
 from moves_cli.models import Section
 from moves_cli.utils.data_handler import DataHandler
+from moves_cli.utils.output_formatter import output
 
 
 def speaker_manager_instance():
@@ -83,10 +84,7 @@ def speaker_add(
         speaker = speaker_manager.add(name, source_presentation, source_transcript)
 
         # Display success message
-        typer.echo(f"Speaker {speaker.label} added.")
-        typer.echo(f"    ID -> {speaker.speaker_id}")
-        typer.echo(f"    Presentation -> {speaker.source_presentation}")
-        typer.echo(f"    Transcript -> {speaker.source_transcript}")
+        typer.echo(f"Speaker {speaker.label} has been successfully added.")
 
     except typer.Exit:
         raise
@@ -148,11 +146,17 @@ def speaker_edit(
         )
 
         # Display updated speaker information
-        typer.echo(f"Speaker '{updated_speaker.name}' updated.")
+        updates = {}
         if presentation_path:
-            typer.echo(f"    Presentation -> {updated_speaker.source_presentation}")
+            updates["New presentation source"] = updated_speaker.source_presentation
         if transcript_path:
-            typer.echo(f"    Transcript -> {updated_speaker.source_transcript}")
+            updates["New transcript source"] = updated_speaker.source_transcript
+        typer.echo(
+            output(
+                f"Speaker {updated_speaker.label} has been successfully edited.",
+                updates,
+            )
+        )
 
     except typer.Exit:
         raise
@@ -174,24 +178,8 @@ def speaker_list():
             typer.echo("No speakers are registered.")
             return
 
-        last_processed_header = "LAST PROCESSED"
-
-        id_width = max(max(len(s.speaker_id) for s in speakers), len("ID"))
-        name_width = max(max(len(s.name) for s in speakers), len("NAME"))
-        # Date format "YYYY-MM-DD HH:MM" is always 16 chars
-        last_processed_width = max(16, len(last_processed_header))
-        status_width = max(len("Not Ready"), len("STATUS"))
-
-        typer.echo(f"Registered Speakers ({len(speakers)})")
-        typer.echo()
-        typer.echo(
-            f"{'ID':<{id_width}} {'NAME':<{name_width}} {'STATUS':<{status_width}} {last_processed_header}"
-        )
-        typer.echo(
-            f"{'─' * id_width} {'─' * name_width} {'─' * status_width} {'─' * last_processed_width}"
-        )
-
-        # Add speaker rows
+        # Build table rows
+        rows: list[dict[str, str]] = []
         for speaker in speakers:
             speaker_path = data_handler.DATA_FOLDER / "speakers" / speaker.speaker_id
             sections_file = speaker_path / "sections.json"
@@ -205,10 +193,16 @@ def speaker_list():
                 except ValueError:
                     last_processed_str = "Invalid Date"
 
-            # Format with dynamic spacing to align columns
-            typer.echo(
-                f"{speaker.speaker_id:<{id_width}} {speaker.name:<{name_width}} {ready_status:<{status_width}} {last_processed_str}"
+            rows.append(
+                {
+                    "NAME": speaker.name,
+                    "ID": speaker.speaker_id,
+                    "STATUS": ready_status,
+                    "LAST PROCESSED": last_processed_str,
+                }
             )
+
+        typer.echo(output(f"There are {len(speakers)} registered speaker(s).", rows))
 
     except typer.Exit:
         raise
@@ -235,11 +229,6 @@ def speaker_show(
         status = "Ready" if sections_file.exists() else "Not Ready"
 
         # Display speaker details
-        typer.echo(f"Showing details for speaker {resolved_speaker.label}")
-        typer.echo(f"    ID -> {resolved_speaker.speaker_id}")
-        typer.echo(f"    Name -> {resolved_speaker.name}")
-        typer.echo(f"    Status -> {status}")
-
         last_processed_str = "N/A"
         if resolved_speaker.last_processed:
             try:
@@ -247,10 +236,20 @@ def speaker_show(
                 last_processed_str = dt.strftime("%Y-%m-%d %H:%M")
             except ValueError:
                 last_processed_str = "Invalid Date"
-        typer.echo(f"    Last Processed -> {last_processed_str}")
 
-        typer.echo(f"    Presentation -> {resolved_speaker.source_presentation}")
-        typer.echo(f"    Transcript -> {resolved_speaker.source_transcript}")
+        typer.echo(
+            output(
+                f"Showing details for {resolved_speaker.label}",
+                {
+                    "Name": resolved_speaker.name,
+                    "ID": resolved_speaker.speaker_id,
+                    "Status": status,
+                    "Last Processed": last_processed_str,
+                    "Presentation": resolved_speaker.source_presentation,
+                    "Transcript": resolved_speaker.source_transcript,
+                },
+            )
+        )
 
     except typer.Exit:
         raise
@@ -312,9 +311,10 @@ def speaker_process(
 
         # Display processing message
         if len(resolved_speakers) == 1:
-            typer.echo(f"Processing speaker {resolved_speakers[0].label}...")
+            pass  # Handled in speaker_manager.process
         else:
-            typer.echo(f"Processing {len(resolved_speakers)} speakers...")
+            # typer.echo(f"Processing {len(resolved_speakers)} speakers...")
+            pass
 
         # Call speaker_manager.process with resolved speakers
         results = asyncio.run(
@@ -328,22 +328,26 @@ def speaker_process(
             result = results[0]
             speaker = resolved_speakers[0]
             typer.echo(f"Speaker {speaker.label} processed.")
-            typer.echo(f"{result.section_count} sections have been created.")
+            typer.echo()
             typer.echo(
-                f"The processing time took {result.processing_time_seconds:.1f} seconds."
+                f"{result.section_count} sections have been created in {result.processing_time_seconds:.1f} seconds."
             )
         else:
             typer.echo(f"{len(resolved_speakers)} speakers processed.")
 
             # Display detailed results for all speakers
             total_time = sum(result.processing_time_seconds for result in results)
+            results_dict = {}
             for i, result in enumerate(results):
                 speaker = resolved_speakers[i]
-                typer.echo(
-                    f"{speaker.label} -> {result.section_count} sections ({result.processing_time_seconds:.1f}s)"
+                results_dict[speaker.label] = (
+                    f"{result.section_count} sections ({result.processing_time_seconds:.1f}s)"
                 )
 
-            typer.echo(f"The processing time took {total_time:.1f} seconds for total.")
+            typer.echo(output(None, results_dict))
+
+            typer.echo()
+            typer.echo(f"Processing time took {total_time:.1f} seconds in total.")
 
     except typer.Exit:
         raise
@@ -392,16 +396,13 @@ def speaker_delete(
             f"Are you sure you want to delete the following {len(resolved_speakers)} speaker(s)?"
         )
         for speaker in resolved_speakers:
-            typer.echo(f"    {speaker.label}")
+            typer.echo(f"  {speaker.speaker_id}")
         typer.echo()
 
         if not yes:
-            typer.confirm("Do you want to proceed?", default=True, abort=True)
+            typer.confirm("Proceed?", default=True, abort=True)
             typer.echo("Yes")
             typer.echo()
-
-        # Display deletion message
-        typer.echo(f"Deleting {len(resolved_speakers)} speaker(s)...\n")
 
         # Delete speakers using for loop and display results immediately
         deleted_count = 0
@@ -410,12 +411,16 @@ def speaker_delete(
         for speaker in resolved_speakers:
             success = speaker_manager.delete(speaker)
             if success:
-                typer.echo(f"Speaker {speaker.label} deleted.")
+                if yes:
+                    typer.echo(f"Speaker {speaker.label} deleted.")
                 deleted_count += 1
             else:
                 typer.echo(f"Could not delete speaker '{speaker.name}'.", err=True)
                 typer.echo("    Failed to delete speaker data.", err=True)
                 failed_count += 1
+
+        if not yes and deleted_count > 0:
+            typer.echo("Speaker(s) deleted.")
 
         # Exit with error if any deletions failed
         if failed_count > 0:
@@ -491,8 +496,8 @@ def presentation_control(
                 sections, window_size=window_size
             )
 
-        typer.echo(f"Presentation control started for {resolved_speaker.label}.")
-        typer.echo("    [←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit\n")
+        typer.echo(f"Live control session started for {resolved_speaker.label}.")
+        typer.echo("  [←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit\n")
 
         controller.control()
 
@@ -515,14 +520,9 @@ def settings_list(
         settings_editor = settings_editor_instance()
         settings = settings_editor.list()
 
-        # Display settings in Direct Summary format
-        typer.echo("Application Settings.")
-
-        # Display model setting
+        # Display settings
         model_value = settings.model if settings.model else "Not configured"
-        typer.echo(f"    model (LLM Model) -> {model_value}")
 
-        # Display API key setting
         if settings.key:
             display_key = settings.key
             if not show:
@@ -530,9 +530,15 @@ def settings_list(
                     display_key = f"{settings.key[:4]}{'*' * (len(settings.key) - 8)}{settings.key[-4:]}"
                 else:
                     display_key = "*" * len(settings.key)
-            typer.echo(f"    key (API Key) -> {display_key}")
         else:
-            typer.echo("    key (API Key) -> Not configured")
+            display_key = "Not configured"
+
+        typer.echo(
+            output(
+                f"moves settings (see: {settings_editor.data_handler.DATA_FOLDER / 'settings.toml'})",
+                {"model (LLM Model)": model_value, "key (API Key)": display_key},
+            )
+        )
 
     except typer.Exit:
         raise
@@ -563,8 +569,7 @@ def settings_set(
         success = settings_editor.set(key, value)
 
         if success:
-            typer.echo(f"Setting '{key}' updated.")
-            typer.echo(f"    New Value -> {value}")
+            typer.echo(output(f"Setting '{key}' updated.", {"New Value": value}))
         else:
             typer.echo(f"Could not update setting '{key}'.", err=True)
             raise typer.Exit(1)
@@ -601,17 +606,18 @@ def settings_unset(
         success = settings_editor.unset(key)
 
         if success:
-            # Display confirmation in Direct Summary format
+            # Display confirmation
             if key in settings_editor._template_defaults:
                 display_value = (
                     "Not configured" if template_value is None else str(template_value)
                 )
-                typer.echo(f"Setting '{key}' reset to default.")
-                typer.echo(f"    New Value -> {display_value}")
             else:
-                # Key was removed (not in template)
-                typer.echo(f"Setting '{key}' reset to default.")
-                typer.echo("    New Value -> Not configured")
+                display_value = "Not configured"
+            typer.echo(
+                output(
+                    f"Setting '{key}' reset to default.", {"New Value": display_value}
+                )
+            )
         else:
             typer.echo(f"Could not reset setting '{key}'.", err=True)
             raise typer.Exit(1)
