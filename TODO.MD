@@ -28,13 +28,11 @@
 ### CRITICAL: Memory Safety Issues Related to ID Usage
 
 - [x] **`phonetic.py` (Lines 10, 23)**: Unsafe use of `id(chunk)`
-
   - **Issue**: In Python, `id()` returns the memory address. When chunk objects are garbage collected and recreated, IDs change.
   - **Impact**: Phonetic codes may not be found for chunks in the `candidates` list in the `compare()` method, potentially causing `KeyError` or incorrect results.
   - **Solution**: Add a unique hash or ID field to the `Chunk` model, or use an immutable tuple like `(partial_content, tuple(source_sections))`.
 
 - [x] **`semantic.py` (Lines 24, 37)**: Unsafe use of `id(chunk)`
-
   - **Issue**: Same memory safety problem - when chunk objects are recreated, they won't be found in the embeddings dictionary.
   - **Impact**: `KeyError` or incorrect embedding matches, leading to errors in similarity calculations.
   - **Solution**: Use a stable identifier for chunks.
@@ -47,13 +45,11 @@
 ### MEDIUM: Concurrency and Thread Safety Issues
 
 - [x] **`presentation_controller.py` (Lines 59-64)**: Race condition risk for `current_section` and queues
-
   - **Issue**: `self.current_section` is only protected by `section_lock` but the initial assignment (line 59) is outside the lock.
   - **Impact**: Race condition may occur during initial section assignment in multi-threaded environment.
   - **Solution**: Perform initial assignment inside the lock or before starting threads in `__init__`.
 
 - [x] **`presentation_controller.py` (Lines 86-110)**: Error information lost in exception handling with shutdown_flag
-
   - **Issue**: In `except Exception:` block, only `shutdown_flag.set()` is called, error is not logged or reported to user.
   - **Impact**: Silent failures, debugging becomes difficult.
   - **Solution**: At minimum, write error to stderr or add logging.
@@ -66,13 +62,11 @@
 ### MEDIUM: Data Consistency and Validation Issues
 
 - [x] **`chunk_producer.py` (Line 30)**: No ordering guarantee when converting dictionary to list
-
   - **Issue**: Using `sections_dict.values()` but although Python 3.7+ preserves dict insertion order, this is not guaranteed behavior.
   - **Impact**: Section ordering may be mixed up, causing incorrect navigation.
   - **Solution**: Use `sorted(sections_dict.values(), key=lambda s: s.section_index)`.
 
 - [x] **`data_handler.py` (Lines 24, 33)**: Path concatenation inconsistency
-
   - **Issue**: `write()` and `read()` methods use `self.DATA_FOLDER / Path(path)` but don't use the `_resolve_path()` method.
   - **Impact**: Absolute paths may be double-prepended (previously fixed but only for `copy()`).
   - **Solution**: Use `_resolve_path()` in all methods.
@@ -85,14 +79,12 @@
 ### MEDIUM: Resource Management and Performance
 
 - [ ] ~~**`presentation_controller.py` (Line 41)**: Model download with `asyncio.run()` on every `__init__` call~~
-
   - ~~**Issue**: Model download check is performed every time `PresentationController` is created, this is a blocking operation.~~
   - ~~**Impact**: UI freeze, unnecessary network checks.~~
   - ~~**Solution**: Perform model preparation once at CLI level, or use lazy loading.~~
   - **Not an issue**: Model preparer already has excellent caching - it verifies checksums (~50-100ms) and returns immediately if files are valid. No network calls after initial download.
 
 - [ ] ~~**`semantic.py` (Lines 8-15)**: `TextEmbedding` model reloaded for each Semantic instance~~
-
   - ~~**Issue**: Model is reloaded every time a new `SimilarityCalculator` is created for each speaker.~~
   - ~~**Impact**: Memory waste, slow startup.~~
   - ~~**Solution**: Share the model using singleton pattern or dependency injection.~~
@@ -107,26 +99,22 @@
 ### LOW: Code Quality and Maintainability
 
 - [x] **`similarity_calculator.py` (Lines 32-38)**: Redundant `if max_p == 0` check
-
   - **Issue**: Lines 32-33 already assign 1.0 if `max()` result is 0, then check again.
   - **Impact**: Code duplication, reduced readability.
   - **Solution**: Remove second check or combine: `max_p = max(phonetic_scores.values()) if phonetic_scores else 1.0; max_p = max_p or 1.0`
 
 - [x] **`text_normalizer.py` (Line 48)**: No exception handling for `num2words()`
-
   - **Issue**: `num2words()` may fail for very large numbers or special formats.
   - **Impact**: Text normalization fails, affecting entire pipeline.
   - **Solution**: Add try-except, keep original number on error.
   - **Fixed**: Added `NormalizationMode` enum (LIVE/PREPROCESS). LIVE mode skips num2words entirely for live speech. PREPROCESS mode includes exception handling with fallback.
 
 - [x] **`section_producer.py` (Lines 59-60)**: LLM validation constraints calculated at runtime
-
   - **Issue**: `min_items` and `max_items` are recalculated on every LLM call.
   - **Impact**: Not a performance loss but code smell.
   - **Solution**: Calculate slide count beforehand and pass as parameter.
 
 - [x] **`cli.py` (Lines 183-189)**: Complex list comprehension with datetime parsing
-
   - **Issue**: Low readability, difficult error handling.
   - **Impact**: Maintenance difficulty.
   - **Solution**: Extract to helper function.
@@ -140,19 +128,16 @@
 ### LOW: Type Safety and Validation
 
 - [x] **`models.py` (Lines 16-18)**: `Chunk` is frozen but `source_sections` is mutable list
-
   - **Issue**: Despite `frozen=True`, list contents can be modified.
   - **Impact**: Immutability guarantee is broken.
   - **Solution**: Use `source_sections: tuple[Section, ...]` or convert to tuple in `__post_init__`.
 
 - [x] **`data_handler.py` (Lines 62-63)**: Unlink after target_path.exists() check in `rename()` method
-
   - **Issue**: Race condition - another process could delete the file between exists check and unlink.
   - **Impact**: `FileNotFoundError` may occur.
   - **Solution**: `missing_ok=True` parameter already exists but not used in `unlink()` call.
 
 - ~~**`settings_editor.py` (Lines 22-24)**: Exception catching too broad~~ **Not an issue**
-
   - **Issue**: `except Exception:` catches all errors, no specific error handling.
   - **Impact**: Debugging becomes difficult, different errors handled the same way.
   - **Solution**: Separate specific exceptions like `FileNotFoundError`, `tomlkit.exceptions.ParseError`.
@@ -180,3 +165,5 @@ _(Array indexing like `sections[0]` remains correct, accessing the first section
 - [x] ~~Move the ID generation logics from inline codes to the models' itself for more centralized and maintainable code, while still keeping the id generation utility.~~ — Do better SOLID alternative instead, DI-based chunk ID generation.
 
 - [x] Refine and unify the CLI output function to handle text, key-value pairs, and tables consistently across the application, replacing scattered `typer.echo` formatting with a centralized `output` utility using `rich`.
+
+- [ ] Make the CLI and all other print (typer.echo) files to work with output.
