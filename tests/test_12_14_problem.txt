@@ -1,0 +1,91 @@
+================================================================================
+PROBLEM SCENARIO: SLIDE 14 -> SLIDE 12 INTERVENTION
+================================================================================
+
+[INFO] 15 slides, 116 chunks
+
+================================================================================
+VERIFICATION: What chunks are candidates when current = slide 12?
+================================================================================
+
+[CANDIDATES] Total: 42
+[BY TARGET SLIDE]:
+  Slide 10: 5 chunks
+  Slide 11: 9 chunks
+  Slide 12: 9 chunks
+  Slide 13: 9 chunks
+  Slide 14: 10 chunks <-- SLIDE 14!
+
+[CRITICAL] Slide 14 chunks in candidates: True
+  *** THIS IS THE PROBLEM! ***
+  When supervisor moves from 14 to 12, slide 14 chunks are still candidates!
+
+================================================================================
+THE PROBLEM SCENARIO
+--------------------------------------------------------------------------------
+  1. Speaker was on slide 14, %98-100 confidence
+  2. Supervisor manually moved to slide 12 (2 slides back)
+  3. Buffer still has 10 words from slide 14, 2 words from slide 12
+  4. System compares with candidates (which INCLUDE slide 14 chunks!)
+================================================================================
+
+[INPUT] "olarak urunumuz mukemmel kalitede musteri memnuniyeti en onemli onceliktir finansal projeksiyonlar"
+[CURRENT POSITION] Slide 12 (set by supervisor)
+[BUFFER COMPOSITION] ~10 words from slide 14, ~2 words from slide 12
+
+#   Target   Score    Sources      Content
+--------------------------------------------------------------------------------
+1   14       80.4%    [13, 14]     surum lansman sonuc olarak urunumuz...
+2   14       72.2%    [13, 14]     beta surum lansman sonuc olarak uru...
+3   12       65.7%    [10, 11, 12] bildirimler gecmis donem performans...
+4   14       65.3%    [13, 14]     ozellikler beta surum lansman sonuc...
+5   14       64.7%    [13, 14]     yeni ozellikler beta surum lansman ...
+6   12       64.5%    [11, 12]     gecmis donem performansi onceki yil...
+7   14       62.3%    [13, 14]     haritasi urun gelistirme yeni ozell...
+8   14       61.0%    [13, 14]     gelistirme yeni ozellikler beta sur...
+
+[ANALYSIS] CONSISTENT: Both -> Slide 14
+[DECISION] NAVIGATE -> Slide 14
+
+********************************************************************************
+*** PROBLEM CONFIRMED! ***
+System wants to go to slide 14, overriding supervisor's decision!
+********************************************************************************
+
+================================================================================
+WORSE CASE: Buffer is 11 words from slide 14, 1 word from slide 12
+================================================================================
+
+[INPUT] "sonuc olarak urunumuz mukemmel kalitede musteri memnuniyeti en onemli onceliktir finansal"
+
+#   Target   Score    Sources      Content
+--------------------------------------------------------------------------------
+1   14       90.2%    [13, 14]     surum lansman sonuc olarak urunumuz...
+2   14       83.0%    [13, 14]     beta surum lansman sonuc olarak uru...
+3   14       74.1%    [13, 14]     ozellikler beta surum lansman sonuc...
+4   14       73.4%    [13, 14]     yeni ozellikler beta surum lansman ...
+5   14       66.8%    [13, 14]     gelistirme yeni ozellikler beta sur...
+6   14       64.0%    [13, 14]     haritasi urun gelistirme yeni ozell...
+7   14       63.1%    [13, 14]     urun gelistirme yeni ozellikler bet...
+8   14       60.1%    [12, 13, 14] tahsisi yol haritasi urun gelistirm...
+
+[ANALYSIS] CONSISTENT: Both -> Slide 14
+[DECISION] NAVIGATE -> Slide 14
+
+*** PROBLEM! System wants slide 14! ***
+
+================================================================================
+CONCLUSION
+================================================================================
+
+    CandidateChunkGenerator does NOT solve the problem!
+    
+    It only filters DISTANT slides (e.g., slide 11 when on slide 14).
+    But within the range (current +3 / -2), ALL chunks are candidates.
+    
+    When supervisor moves:
+    - From 14 to 12: Slide 14 chunks ARE candidates (14 - 2 = 12)
+    - From 14 to 13: Slide 14 chunks ARE candidates (14 - 2 = 12 <= 13)
+    
+    The problem EXISTS for any intervention within ±2/+3 slides!
+    
