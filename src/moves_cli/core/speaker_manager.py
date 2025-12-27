@@ -52,9 +52,10 @@ class SpeakerManager:
             )
 
         # Check 2: Generate unique speaker ID with collision detection
-        max_retries = 3
+        from moves_cli.config import SPEAKER_ID_GENERATION_MAX_RETRIES
+
         speaker_id = None
-        for attempt in range(max_retries):
+        for attempt in range(SPEAKER_ID_GENERATION_MAX_RETRIES):
             candidate_id = id_generator.generate_speaker_id(name)
             if candidate_id not in speaker_ids:
                 speaker_id = candidate_id
@@ -62,7 +63,7 @@ class SpeakerManager:
 
         if speaker_id is None:
             raise RuntimeError(
-                f"Failed to generate unique speaker ID after {max_retries} attempts. "
+                f"Failed to generate unique speaker ID after {SPEAKER_ID_GENERATION_MAX_RETRIES} attempts. "
                 f"This is extremely rare - please try again."
             )
 

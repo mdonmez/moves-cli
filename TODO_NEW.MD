@@ -22,7 +22,7 @@
 
 - [ ] **Create Datetime Formatting Utility** - Extract duplicate datetime parsing and formatting logic into reusable utility function. Currently the same try-except pattern for parsing ISO datetime strings and formatting them is repeated in multiple CLI commands. **Files:** `src/moves_cli/utils/formatters.py` (create format_datetime function), `src/moves_cli/cli.py` (replace duplicate datetime formatting code in speaker_list and speaker_show commands)
 
-- [ ] **Add Magic Number Constants** - Replace magic numbers with named constants in config.py for better maintainability. Examples: SPEAKER_ID_GENERATION_MAX_RETRIES (currently hardcoded as 3), SPEAKER_ID_SUFFIX_LENGTH (currently 5). **Files:** `src/moves_cli/config.py` (add constants), `src/moves_cli/core/speaker_manager.py` (use constants instead of magic numbers)
+- [x] **Add Magic Number Constants** - Replace magic numbers with named constants in config.py for better maintainability. Examples: SPEAKER_ID_GENERATION_MAX_RETRIES (currently hardcoded as 3), SPEAKER_ID_SUFFIX_LENGTH (currently 5). **Files:** `src/moves_cli/config.py` (add constants), `src/moves_cli/core/speaker_manager.py` (use constants instead of magic numbers)
 
 - [ ] **Optimize Speaker Resolve Logic** - Replace O(n) list operations with O(1) dictionary lookup in speaker resolution. Currently creates speaker_ids list and uses index() which is inefficient. Use dictionary mapping for direct access. **Files:** `src/moves_cli/core/speaker_manager.py` (refactor resolve method to use dict-based lookup)
 

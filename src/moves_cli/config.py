@@ -3,6 +3,10 @@ from pathlib import Path
 # General configuration constants
 DATA_FOLDER: Path = Path.home() / ".moves"
 
+# Speaker ID generation
+SPEAKER_ID_SUFFIX_LENGTH: int = 5
+SPEAKER_ID_GENERATION_MAX_RETRIES: int = 3
+
 # Similarity calculator configuration
 SEMANTIC_WEIGHT: float = 0.6
 PHONETIC_WEIGHT: float = 0.4
