@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] **Expand Candidate Window Range** - Increase the candidate chunk search window from current -2/+3 range to a wider range for better slide prediction accuracy. **Files:** `src/moves_cli/config.py` (update CANDIDATE_RANGE_MIN_OFFSET and CANDIDATE_RANGE_MAX_OFFSET)
+- [x] **Expand Candidate Window Range** - Increase the candidate chunk search window from current -2/+3 range to a wider range for better slide prediction accuracy. **Files:** `src/moves_cli/config.py` (update CANDIDATE_RANGE_MIN_OFFSET and CANDIDATE_RANGE_MAX_OFFSET)
 
 - [ ] **Tie-Breaking for Equal Similarity Scores** - When multiple candidates have equal similarity scores, implement tie-breaking logic to prefer the candidate whose target slide is closest to the current section on the right side (forward direction). This ensures natural forward progression during presentations. **Files:** `src/moves_cli/core/components/similarity_calculator.py` (add proximity-based sorting in compare method when scores are equal)
 
