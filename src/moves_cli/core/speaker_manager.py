@@ -38,6 +38,17 @@ class SpeakerManager:
         self.data_handler = data_handler
         self.SPEAKERS_PATH = self.data_handler.DATA_FOLDER.resolve() / "speakers"
 
+    @staticmethod
+    def _resolve_file(
+        source: Path, backup: Path, file_type: str, speaker_label: str
+    ) -> tuple[str, Path]:
+        """Resolve file from source or backup, returns (origin, path)."""
+        if source.exists():
+            return ("SOURCE", source)
+        if backup.exists():
+            return ("BACKUP", backup)
+        raise FileNotFoundError(f"Missing {file_type} file for speaker {speaker_label}")
+
     def add(
         self, name: str, source_presentation: Path, source_transcript: Path
     ) -> Speaker:
@@ -149,30 +160,12 @@ class SpeakerManager:
             backup_presentation = speaker_path / "presentation.pdf"
             backup_transcript = speaker_path / "transcript.pdf"
 
-            presentation_from = None
-            transcript_from = None
-
-            if source_presentation.exists():
-                presentation_from = "SOURCE"
-                pres_path_display = source_presentation
-            elif backup_presentation.exists():
-                presentation_from = "BACKUP"
-                pres_path_display = backup_presentation
-            else:
-                raise FileNotFoundError(
-                    f"Missing presentation file for speaker {speaker.label}"
-                )
-
-            if source_transcript.exists():
-                transcript_from = "SOURCE"
-                trans_path_display = source_transcript
-            elif backup_transcript.exists():
-                transcript_from = "BACKUP"
-                trans_path_display = backup_transcript
-            else:
-                raise FileNotFoundError(
-                    f"Missing transcript file for speaker {speaker.label}"
-                )
+            presentation_from, pres_path_display = self._resolve_file(
+                source_presentation, backup_presentation, "presentation", speaker.label
+            )
+            transcript_from, trans_path_display = self._resolve_file(
+                source_transcript, backup_transcript, "transcript", speaker.label
+            )
 
             typer.echo(
                 output(

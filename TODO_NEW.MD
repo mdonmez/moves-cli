@@ -28,7 +28,7 @@
 
 - [x] **Optimize Speaker Resolve Logic** - Replace O(n) list operations with O(1) dictionary lookup in speaker resolution. Currently creates speaker_ids list and uses index() which is inefficient. Use dictionary mapping for direct access. **Files:** `src/moves_cli/core/speaker_manager.py` (refactor resolve method to use dict-based lookup)
 
-- [ ] **Extract File Resolution Helper** - Simplify backup file resolution logic by extracting 24-line source/backup file checking code into reusable helper function. Currently duplicated for presentation and transcript files. **Files:** `src/moves_cli/core/speaker_manager.py` (create \_resolve_file helper method, use it in process method)
+- [x] **Extract File Resolution Helper** - Simplify backup file resolution logic by extracting 24-line source/backup file checking code into reusable helper function. Currently duplicated for presentation and transcript files. **Files:** `src/moves_cli/core/speaker_manager.py` (create \_resolve_file helper method, use it in process method)
 
 - [x] **Remove Commented Code** - Clean up commented-out code blocks that add noise without value. Examples include commented typer.echo statements with explanatory comments. Either remove entirely or convert to proper TODO comments if functionality is planned. **Files:** `src/moves_cli/cli.py`, `src/moves_cli/core/speaker_manager.py`
 
