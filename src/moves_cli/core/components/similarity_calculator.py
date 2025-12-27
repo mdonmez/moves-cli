@@ -17,7 +17,7 @@ class SimilarityCalculator:
         self.phonetic = Phonetic(all_chunks)
 
     def compare(
-        self, input_str: str, candidates: list[Chunk]
+        self, input_str: str, candidates: list[Chunk], current_section_index: int = 0
     ) -> list[SimilarityResult]:
         if not candidates:
             return []
@@ -51,16 +51,25 @@ class SimilarityCalculator:
                     + semantic_scores.get(candidate.chunk_id, 0.0) * factor_s
                 )
 
-                if raw_score >= 0.995:
-                    final_score = 1.0
-                else:
-                    final_score = min(1.0, raw_score)
+                final_score = min(1.0, raw_score)
 
                 final_results.append(
                     SimilarityResult(chunk=candidate, score=final_score)
                 )
 
-            final_results.sort(key=lambda x: x.score, reverse=True)
+            # Tie-breaking: equal scores prefer closest slide on right (forward direction)
+            final_results.sort(
+                key=lambda x: (
+                    -x.score,
+                    (0, d)
+                    if (
+                        d := max(s.section_index for s in x.chunk.source_sections)
+                        - current_section_index
+                    )
+                    >= 0
+                    else (1, -d),
+                )
+            )
 
             return final_results
 

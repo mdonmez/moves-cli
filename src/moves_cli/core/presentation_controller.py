@@ -135,7 +135,7 @@ class PresentationController:
                     continue
 
                 similarity_results = self.similarity_calculator.compare(
-                    input_text, candidate_chunks
+                    input_text, candidate_chunks, current_section.section_index
                 )
 
                 top_match = similarity_results[0]
