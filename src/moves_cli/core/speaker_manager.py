@@ -106,22 +106,26 @@ class SpeakerManager:
 
     def resolve(self, speaker_pattern: str) -> Speaker:
         speakers = self.list()
-        speaker_ids = [speaker.speaker_id for speaker in speakers]
 
-        if speaker_pattern in speaker_ids:
-            return speakers[speaker_ids.index(speaker_pattern)]
+        # Build lookup dicts - O(n) once
+        by_id: dict[str, Speaker] = {}
+        by_name: dict[str, list[Speaker]] = {}
+        for speaker in speakers:
+            by_id[speaker.speaker_id] = speaker
+            by_name.setdefault(speaker.name, []).append(speaker)
 
-        matched_speakers = [
-            speaker for speaker in speakers if speaker.name == speaker_pattern
-        ]
-        if matched_speakers:
-            if len(matched_speakers) == 1:
-                return matched_speakers[0]
-            else:
-                speaker_list = "\n".join([f"    {s.label}" for s in matched_speakers])
-                raise ValueError(
-                    f"Multiple speakers found matching '{speaker_pattern}'. Be more specific:\n{speaker_list}"
-                )
+        # O(1) lookup by ID
+        if speaker := by_id.get(speaker_pattern):
+            return speaker
+
+        # O(1) lookup by name
+        if matches := by_name.get(speaker_pattern):
+            if len(matches) == 1:
+                return matches[0]
+            speaker_list = "\n".join([f"    {s.label}" for s in matches])
+            raise ValueError(
+                f"Multiple speakers found matching '{speaker_pattern}'. Be more specific:\n{speaker_list}"
+            )
 
         raise ValueError(f"No speaker found matching '{speaker_pattern}'.")
 

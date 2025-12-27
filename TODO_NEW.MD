@@ -26,7 +26,7 @@
 
 - [x] **Add Magic Number Constants** - Replace magic numbers with named constants in config.py for better maintainability. Examples: SPEAKER_ID_GENERATION_MAX_RETRIES (currently hardcoded as 3), SPEAKER_ID_SUFFIX_LENGTH (currently 5). **Files:** `src/moves_cli/config.py` (add constants), `src/moves_cli/core/speaker_manager.py` (use constants instead of magic numbers)
 
-- [ ] **Optimize Speaker Resolve Logic** - Replace O(n) list operations with O(1) dictionary lookup in speaker resolution. Currently creates speaker_ids list and uses index() which is inefficient. Use dictionary mapping for direct access. **Files:** `src/moves_cli/core/speaker_manager.py` (refactor resolve method to use dict-based lookup)
+- [x] **Optimize Speaker Resolve Logic** - Replace O(n) list operations with O(1) dictionary lookup in speaker resolution. Currently creates speaker_ids list and uses index() which is inefficient. Use dictionary mapping for direct access. **Files:** `src/moves_cli/core/speaker_manager.py` (refactor resolve method to use dict-based lookup)
 
 - [ ] **Extract File Resolution Helper** - Simplify backup file resolution logic by extracting 24-line source/backup file checking code into reusable helper function. Currently duplicated for presentation and transcript files. **Files:** `src/moves_cli/core/speaker_manager.py` (create \_resolve_file helper method, use it in process method)
 
