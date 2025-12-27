@@ -28,6 +28,6 @@
 
 - [ ] **Extract File Resolution Helper** - Simplify backup file resolution logic by extracting 24-line source/backup file checking code into reusable helper function. Currently duplicated for presentation and transcript files. **Files:** `src/moves_cli/core/speaker_manager.py` (create \_resolve_file helper method, use it in process method)
 
-- [ ] **Remove Commented Code** - Clean up commented-out code blocks that add noise without value. Examples include commented typer.echo statements with explanatory comments. Either remove entirely or convert to proper TODO comments if functionality is planned. **Files:** `src/moves_cli/cli.py`, `src/moves_cli/core/speaker_manager.py`
+- [x] **Remove Commented Code** - Clean up commented-out code blocks that add noise without value. Examples include commented typer.echo statements with explanatory comments. Either remove entirely or convert to proper TODO comments if functionality is planned. **Files:** `src/moves_cli/cli.py`, `src/moves_cli/core/speaker_manager.py`
 
 - [ ] **Add Missing Type Hints** - Add type hints to functions missing them, particularly signal handlers and internal helper functions. Improves type safety and IDE support. **Files:** `src/moves_cli/core/speaker_manager.py` (add type hints to sigint_handler and other internal functions)

@@ -181,7 +181,6 @@ class SpeakerManager:
 
         if not skip_confirmation:
             typer.confirm("Proceed?", default=True, abort=True)
-            # typer.echo("Yes") # User example seems to imply input echo, but usually cleaner without manual echo if tool handles it
             typer.echo()
 
         # Use rich progress for dynamic feedback

@@ -309,13 +309,6 @@ def speaker_process(
             )
             raise typer.Exit(1)
 
-        # Display processing message
-        if len(resolved_speakers) == 1:
-            pass  # Handled in speaker_manager.process
-        else:
-            # typer.echo(f"Processing {len(resolved_speakers)} speakers...")
-            pass
-
         # Call speaker_manager.process with resolved speakers
         results = asyncio.run(
             speaker_manager.process(
