@@ -6,6 +6,7 @@ import threading
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
+from types import FrameType
 
 import typer
 from rich.progress import (
@@ -13,6 +14,7 @@ from rich.progress import (
     ProgressColumn,
     SpinnerColumn,
     Task,
+    TaskID,
     TextColumn,
 )
 from rich.text import Text
@@ -193,20 +195,22 @@ class SpeakerManager:
             # Install SIGINT handler to force exit on Ctrl+C
             original_sigint = signal.getsignal(signal.SIGINT)
 
-            def sigint_handler(signum, frame):
+            def sigint_handler(signum: int, frame: FrameType | None) -> None:
                 progress.stop()
                 typer.echo("\nCancelled.")
                 sys.exit(130)  # 128 + SIGINT(2)
 
             signal.signal(signal.SIGINT, sigint_handler)
 
-            async def process_speaker(speaker, speaker_path, delay, task_id):
+            async def process_speaker(
+                speaker: Speaker, speaker_path: Path, delay: int, task_id: TaskID
+            ) -> ProcessResult:
                 import time
 
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
 
-                def progress_callback(msg: str):
+                def progress_callback(msg: str) -> None:
                     progress.update(
                         task_id,
                         description=f"{speaker.label}: {msg}",
@@ -278,7 +282,7 @@ class SpeakerManager:
                 loop = asyncio.get_running_loop()
                 future = loop.create_future()
 
-                def run_generation():
+                def run_generation() -> None:
                     try:
                         result = section_producer.generate_sections(
                             presentation_path=presentation_path,
