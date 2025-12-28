@@ -1,5 +1,4 @@
 import asyncio
-import json
 import signal
 import sys
 import threading
@@ -49,6 +48,37 @@ class SpeakerManager:
             return ("BACKUP", backup)
         raise FileNotFoundError(f"Missing {file_type} file for speaker {speaker_label}")
 
+    def _write_speaker_yaml(self, path: Path, speaker: Speaker) -> None:
+        """Speaker'ı YAML dosyasına yaz."""
+        from io import StringIO
+
+        from ruamel.yaml import YAML
+
+        data = {
+            k: str(v) if isinstance(v, Path) else v for k, v in asdict(speaker).items()
+        }
+        yaml = YAML()
+        yaml.default_flow_style = False
+        output = StringIO()
+        yaml.dump(data, output)
+        self.data_handler.write(path, output.getvalue())
+
+    def _read_speaker_yaml(self, path: Path) -> Speaker:
+        """YAML dosyasından Speaker oku."""
+        from io import StringIO
+
+        from ruamel.yaml import YAML
+
+        yaml = YAML()
+        data = yaml.load(StringIO(self.data_handler.read(path)))
+
+        # Path string'lerini Path objesine dönüştür
+        for k, v in data.items():
+            if isinstance(v, str) and ("/" in v or "\\" in v):
+                data[k] = Path(v)
+
+        return Speaker(**data)
+
     def add(
         self, name: str, source_presentation: Path, source_transcript: Path
     ) -> Speaker:
@@ -86,12 +116,7 @@ class SpeakerManager:
             source_transcript=source_transcript.resolve(),
         )
 
-        data = {
-            k: str(v) if isinstance(v, Path) else v for k, v in asdict(speaker).items()
-        }
-        self.data_handler.write(
-            speaker_path / "speaker.json", json.dumps(data, indent=4)
-        )
+        self._write_speaker_yaml(speaker_path / "speaker.yaml", speaker)
         return speaker
 
     def edit(
@@ -107,12 +132,7 @@ class SpeakerManager:
         if source_transcript:
             speaker.source_transcript = source_transcript.resolve()
 
-        data = {
-            k: str(v) if isinstance(v, Path) else v for k, v in asdict(speaker).items()
-        }
-        self.data_handler.write(
-            speaker_path / "speaker.json", json.dumps(data, indent=4)
-        )
+        self._write_speaker_yaml(speaker_path / "speaker.yaml", speaker)
         return speaker
 
     def resolve(self, speaker_pattern: str) -> Speaker:
@@ -301,8 +321,8 @@ class SpeakerManager:
 
                 progress_callback("Writing to file...")
                 self.data_handler.write(
-                    speaker_path / "sections.json",
-                    json.dumps(section_producer.convert_to_list(sections), indent=2),
+                    speaker_path / "sections.yaml",
+                    section_producer.convert_to_yaml(sections),
                 )
 
                 processing_time = time.perf_counter() - start_time
@@ -316,13 +336,7 @@ class SpeakerManager:
 
                 # Update speaker last_processed timestamp
                 speaker.last_processed = datetime.now().isoformat()
-                data = {
-                    k: str(v) if isinstance(v, Path) else v
-                    for k, v in asdict(speaker).items()
-                }
-                self.data_handler.write(
-                    speaker_path / "speaker.json", json.dumps(data, indent=4)
-                )
+                self._write_speaker_yaml(speaker_path / "speaker.yaml", speaker)
 
                 return ProcessResult(
                     section_count=len(sections),
@@ -357,11 +371,7 @@ class SpeakerManager:
         speakers = []
         for folder in self.data_handler.list(self.SPEAKERS_PATH):
             if folder.is_dir():
-                speaker_json = folder / "speaker.json"
-                if speaker_json.exists():
-                    data = json.loads(self.data_handler.read(speaker_json))
-                    for k, v in data.items():
-                        if isinstance(v, str) and ("/" in v or "\\" in v):
-                            data[k] = Path(v)
-                    speakers.append(Speaker(**data))
+                speaker_yaml = folder / "speaker.yaml"
+                if speaker_yaml.exists():
+                    speakers.append(self._read_speaker_yaml(speaker_yaml))
         return speakers

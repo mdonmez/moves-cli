@@ -1,6 +1,6 @@
 from importlib.resources import files
 from pathlib import Path
-from typing import Callable, Literal, cast
+from typing import Callable, Literal
 
 import instructor
 import pymupdf
@@ -86,23 +86,55 @@ class SectionProducer:
         except Exception as e:
             raise RuntimeError(f"LLM call failed: {e}") from e
 
-    def convert_to_list(
-        self, section_objects: list[Section]
-    ) -> list[dict[str, str | int]]:
-        return [
-            {"content": s.content, "section_index": s.section_index}
-            for s in section_objects
-        ]
+    def convert_to_yaml(self, sections: list[Section]) -> str:
+        """Section listesini YAML formatına dönüştür (folded block scalar)."""
+        from io import StringIO
 
-    def convert_to_objects(
-        self, section_list: list[dict[str, str | int]]
-    ) -> list[Section]:
+        from ruamel.yaml import YAML
+        from ruamel.yaml.comments import CommentedSeq
+        from ruamel.yaml.scalarstring import FoldedScalarString
+
+        def to_folded(content: str) -> str | FoldedScalarString:
+            """Boş değilse FoldedScalarString, boşsa düz string döner."""
+            if not content or not content.strip():
+                return ""
+            text = content if content.endswith("\n") else content + "\n"
+            return FoldedScalarString(text)
+
+        yaml_data = CommentedSeq()
+        for idx, section in enumerate(sections):
+            yaml_data.append(
+                {
+                    "section_index": section.section_index,
+                    "content": to_folded(section.content),
+                }
+            )
+            if idx > 0:
+                yaml_data.yaml_set_comment_before_after_key(idx, before="\n")
+
+        yaml = YAML()
+        yaml.default_flow_style = False
+        yaml.width = 80
+
+        output = StringIO()
+        yaml.dump(yaml_data, output)
+        return output.getvalue()
+
+    def load_from_yaml(self, yaml_content: str) -> list[Section]:
+        """YAML içeriğinden Section listesi oluştur."""
+        from io import StringIO
+
+        from ruamel.yaml import YAML
+
+        yaml = YAML()
+        data = yaml.load(StringIO(yaml_content))
+
         return [
             Section(
-                content=cast(str, s_dict["content"]),
-                section_index=cast(int, s_dict["section_index"]),
+                content=str(item["content"]),
+                section_index=int(item["section_index"]),
             )
-            for s_dict in section_list
+            for item in data
         ]
 
     def generate_sections(

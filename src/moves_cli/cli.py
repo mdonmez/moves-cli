@@ -182,7 +182,7 @@ def speaker_list():
         rows: list[dict[str, str]] = []
         for speaker in speakers:
             speaker_path = data_handler.DATA_FOLDER / "speakers" / speaker.speaker_id
-            sections_file = speaker_path / "sections.json"
+            sections_file = speaker_path / "sections.yaml"
             ready_status = "Ready" if sections_file.exists() else "Not Ready"
 
             last_processed_str = "N/A"
@@ -225,7 +225,7 @@ def speaker_show(
         speaker_path = (
             data_handler.DATA_FOLDER / "speakers" / resolved_speaker.speaker_id
         )
-        sections_file = speaker_path / "sections.json"
+        sections_file = speaker_path / "sections.yaml"
         status = "Ready" if sections_file.exists() else "Not Ready"
 
         # Display speaker details
@@ -435,8 +435,6 @@ def presentation_control(
 ):
     """Start live voice-controlled presentation navigation (requires processed speaker)"""
     try:
-        import json
-
         from rich.progress import Progress, SpinnerColumn, TextColumn
 
         # Get speaker manager
@@ -450,7 +448,7 @@ def presentation_control(
         speaker_path = (
             data_handler.DATA_FOLDER / "speakers" / resolved_speaker.speaker_id
         )
-        sections_file = speaker_path / "sections.json"
+        sections_file = speaker_path / "sections.yaml"
 
         if not sections_file.exists():
             typer.echo(
@@ -463,14 +461,11 @@ def presentation_control(
             )
             raise typer.Exit(1)
 
-        # Load sections data
-        sections_data = json.loads(data_handler.read(sections_file))
-
-        # Lazily import and instantiate SectionProducer
+        # Load sections data from YAML
         from moves_cli.core.components.section_producer import SectionProducer
 
         sec_producer = SectionProducer()
-        sections = sec_producer.convert_to_objects(sections_data)
+        sections = sec_producer.load_from_yaml(data_handler.read(sections_file))
 
         if not sections:
             typer.echo("Error: No sections found in processed data.", err=True)
