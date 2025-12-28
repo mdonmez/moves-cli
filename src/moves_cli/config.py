@@ -2,6 +2,8 @@ from pathlib import Path
 
 # General configuration constants
 DATA_FOLDER: Path = Path.home() / ".moves"
+SECTIONS_FILENAME: str = "sections.yaml"
+SPEAKER_FILENAME: str = "speaker.yaml"
 
 # Speaker ID generation
 SPEAKER_ID_SUFFIX_LENGTH: int = 5

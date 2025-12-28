@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from moves_cli.config import DATA_FOLDER
+from moves_cli.config import DATA_FOLDER, SECTIONS_FILENAME, SPEAKER_FILENAME
 
 
 class NormalizationMode(StrEnum):
@@ -38,6 +38,21 @@ class Speaker:
     @property
     def label(self) -> str:
         return f"{self.name} ({self.speaker_id})"
+
+    @property
+    def data_dir(self) -> Path:
+        """Speaker veri dizini."""
+        return DATA_FOLDER / "speakers" / self.speaker_id
+
+    @property
+    def sections_file(self) -> Path:
+        """Sections dosyası yolu."""
+        return self.data_dir / SECTIONS_FILENAME
+
+    @property
+    def speaker_file(self) -> Path:
+        """Speaker metadata dosyası yolu."""
+        return self.data_dir / SPEAKER_FILENAME
 
 
 @dataclass(frozen=True)

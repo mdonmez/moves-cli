@@ -18,6 +18,7 @@ from rich.progress import (
 )
 from rich.text import Text
 
+from moves_cli.config import SECTIONS_FILENAME, SPEAKER_FILENAME
 from moves_cli.models import ProcessResult, Speaker
 from moves_cli.utils import id_generator
 from moves_cli.utils.data_handler import DataHandler
@@ -116,7 +117,7 @@ class SpeakerManager:
             source_transcript=source_transcript.resolve(),
         )
 
-        self._write_speaker_yaml(speaker_path / "speaker.yaml", speaker)
+        self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
         return speaker
 
     def edit(
@@ -132,7 +133,7 @@ class SpeakerManager:
         if source_transcript:
             speaker.source_transcript = source_transcript.resolve()
 
-        self._write_speaker_yaml(speaker_path / "speaker.yaml", speaker)
+        self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
         return speaker
 
     def resolve(self, speaker_pattern: str) -> Speaker:
@@ -321,7 +322,7 @@ class SpeakerManager:
 
                 progress_callback("Writing to file...")
                 self.data_handler.write(
-                    speaker_path / "sections.yaml",
+                    speaker_path / SECTIONS_FILENAME,
                     section_producer.convert_to_yaml(sections),
                 )
 
@@ -336,7 +337,7 @@ class SpeakerManager:
 
                 # Update speaker last_processed timestamp
                 speaker.last_processed = datetime.now().isoformat()
-                self._write_speaker_yaml(speaker_path / "speaker.yaml", speaker)
+                self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
 
                 return ProcessResult(
                     section_count=len(sections),
@@ -371,7 +372,7 @@ class SpeakerManager:
         speakers = []
         for folder in self.data_handler.list(self.SPEAKERS_PATH):
             if folder.is_dir():
-                speaker_yaml = folder / "speaker.yaml"
+                speaker_yaml = folder / SPEAKER_FILENAME
                 if speaker_yaml.exists():
                     speakers.append(self._read_speaker_yaml(speaker_yaml))
         return speakers

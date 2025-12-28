@@ -169,7 +169,6 @@ def speaker_edit(
 def speaker_list():
     """List all registered speakers with their status"""
     try:
-        data_handler = DataHandler()
         # Get all speakers
         speaker_manager = speaker_manager_instance()
         speakers = speaker_manager.list()
@@ -181,9 +180,7 @@ def speaker_list():
         # Build table rows
         rows: list[dict[str, str]] = []
         for speaker in speakers:
-            speaker_path = data_handler.DATA_FOLDER / "speakers" / speaker.speaker_id
-            sections_file = speaker_path / "sections.yaml"
-            ready_status = "Ready" if sections_file.exists() else "Not Ready"
+            ready_status = "Ready" if speaker.sections_file.exists() else "Not Ready"
 
             last_processed_str = "N/A"
             if speaker.last_processed:
@@ -217,16 +214,11 @@ def speaker_show(
 ):
     """Show detailed information about a speaker"""
     try:
-        data_handler = DataHandler()
         # Resolve speaker
         speaker_manager = speaker_manager_instance()
         resolved_speaker = speaker_manager.resolve(speaker)
 
-        speaker_path = (
-            data_handler.DATA_FOLDER / "speakers" / resolved_speaker.speaker_id
-        )
-        sections_file = speaker_path / "sections.yaml"
-        status = "Ready" if sections_file.exists() else "Not Ready"
+        status = "Ready" if resolved_speaker.sections_file.exists() else "Not Ready"
 
         # Display speaker details
         last_processed_str = "N/A"
@@ -445,12 +437,7 @@ def presentation_control(
         resolved_speaker = speaker_manager.resolve(speaker)
 
         # Check for processed sections data
-        speaker_path = (
-            data_handler.DATA_FOLDER / "speakers" / resolved_speaker.speaker_id
-        )
-        sections_file = speaker_path / "sections.yaml"
-
-        if not sections_file.exists():
+        if not resolved_speaker.sections_file.exists():
             typer.echo(
                 f"Error: Speaker {resolved_speaker.label} has not been processed yet.",
                 err=True,
@@ -465,7 +452,9 @@ def presentation_control(
         from moves_cli.core.components.section_producer import SectionProducer
 
         sec_producer = SectionProducer()
-        sections = sec_producer.load_from_yaml(data_handler.read(sections_file))
+        sections = sec_producer.load_from_yaml(
+            data_handler.read(resolved_speaker.sections_file)
+        )
 
         if not sections:
             typer.echo("Error: No sections found in processed data.", err=True)
