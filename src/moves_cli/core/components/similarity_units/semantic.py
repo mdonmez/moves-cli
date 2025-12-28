@@ -11,9 +11,12 @@ class Semantic:
 
         self._model = TextEmbedding(
             model_name=EmbeddingModel.name,
+            # the specific model path, for using the model at the ml models dir to avoid
+            # auto-download with bad ui. also with this way i can use int8 faster model
             specific_model_path=EmbeddingModel.model_dir,
         )
 
+        # do all chunk embeddings at once for performance
         if all_chunks:
             chunk_contents = [chunk.partial_content for chunk in all_chunks]
 

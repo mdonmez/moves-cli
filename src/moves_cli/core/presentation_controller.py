@@ -19,6 +19,7 @@ from moves_cli.utils import model_preparer, text_normalizer
 
 class PresentationController:
     # The logic specific constants defined here, for general configuration see config.py
+    # Should not change these
     SAMPLE_RATE: int = 16000
     FRAME_DURATION: float = 0.1
     AUDIO_QUEUE_SIZE: int = 5
@@ -82,6 +83,7 @@ class PresentationController:
         )
 
     def _audio_sampler_callback(self, indata, _frames, _time, _status) -> None:
+        # this just puts the audio data into a queue for processing
         if not self.audio_queue.full():
             with suppress(Full):
                 self.audio_queue.put_nowait(indata[:, 0].copy())
@@ -97,11 +99,13 @@ class PresentationController:
                     self.recognizer.decode_stream(stream)
 
                 if text := self.recognizer.get_result(stream):
+                    # we're getting the last window size and process it for real-time app
                     recent_words = text.strip().split()[-self.window_size :]
                     normalized = text_normalizer.normalize_text(" ".join(recent_words))
                     words = normalized.strip().split()
 
                     if words:
+                        # put the words into a queue for processing
                         with suppress(Empty):
                             self.words_queue.get_nowait()
                         with suppress(Full):
@@ -117,6 +121,7 @@ class PresentationController:
         previous_words = []
         while not self.shutdown_flag.is_set():
             try:
+                # get the words from the queue
                 current_words = self.words_queue.get(timeout=self.QUEUE_TIMEOUT)
 
                 if current_words == previous_words:
@@ -126,6 +131,7 @@ class PresentationController:
                 with self.section_lock:
                     current_section = self.current_section
 
+                # ensure the candidate chunks for the current section
                 if not (
                     candidate_chunks
                     := self.candidate_chunk_generator.get_candidate_chunks(
@@ -168,6 +174,7 @@ class PresentationController:
                     f"    Match  → ...{match_preview}\n"
                 )
 
+                # if the similarity is above the threshold, then act
                 if top_match.score >= self.SIMILARITY_THRESHOLD:
                     self._perform_navigation(target_section)
 
@@ -186,6 +193,7 @@ class PresentationController:
             slide_delta = target_slide - current_slide
 
             if slide_delta != 0:
+                # if the slide delta is positive, press right arrow key, otherwise press left arrow key
                 key_to_press = Key.right if slide_delta > 0 else Key.left
                 for _ in range(abs(slide_delta)):
                     self.keyboard_controller.press(key_to_press)
@@ -201,6 +209,7 @@ class PresentationController:
         blocksize = int(self.SAMPLE_RATE * self.FRAME_DURATION)
 
         try:
+            # some audio config, i should move some of them to the top
             with sd.InputStream(
                 samplerate=self.SAMPLE_RATE,
                 blocksize=blocksize,
@@ -220,6 +229,7 @@ class PresentationController:
         finally:
             self.shutdown_flag.set()
 
+            # gracefully shutdown the threads
             threads_to_join = [self.stt_processor_thread, self.navigator_thread]
             for thread in threads_to_join:
                 if thread.is_alive():

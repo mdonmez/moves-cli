@@ -20,5 +20,5 @@ CANDIDATE_RANGE_MIN_OFFSET: int = -3
 CANDIDATE_RANGE_MAX_OFFSET: int = 5
 
 # Default settings (used by SettingsEditor)
-DEFAULT_LLM_MODEL: str = "gemini/gemini-2.5-flash-lite"
-DEFAULT_API_KEY: str = ""  # Empty string (TOML doesn't support null)
+DEFAULT_LLM_MODEL: str = "gemini/gemini-2.5-flash-lite"  # gemini, nearly everyone have google account and gemini api is free
+DEFAULT_API_KEY: str = ""

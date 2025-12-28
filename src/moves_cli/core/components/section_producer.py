@@ -18,11 +18,13 @@ class SectionProducer:
             with pymupdf.open(pdf_path) as doc:
                 match extraction_type:
                     case "transcript":
+                        # extract all text from pdf and remove extra spaces, one line full text just.
                         full_text = "".join(page.get_text("text") for page in doc)  # type: ignore
                         result = " ".join(full_text.split())
-
                         return result
+
                     case "presentation":
+                        # for page by page, extract text and remove extra spaces, one line full text just. put new lines between pages.
                         markdown_sections = []
                         slide_count = 0
                         for i, page in enumerate(doc):  # type: ignore
@@ -48,25 +50,32 @@ class SectionProducer:
     ) -> list[str]:
         slide_count = len(presentation_data.split("\n\n"))
 
+        # define output model with schema to reliable extract sections from llm response
         class SectionsOutputModel(BaseModel):
             class SectionItem(BaseModel):
                 section_index: int = Field(
-                    ..., ge=1, description="Index starting from 1"
+                    ...,
+                    ge=1,
+                    description="Index starting from 1",  # descriptions for llm to understand the schema
                 )
                 content: str = Field(..., description="Content of the section")
 
             sections: list[SectionItem] = Field(  # type: ignore
                 ...,
                 description="List of section items, one for each slide",
-                min_items=slide_count,
+                min_items=slide_count,  # must be exact number of slides, min or max.
                 max_items=slide_count,
             )
 
         try:
+            # hmm, i need to rewrite this system prompt for broader use cases, current one is too restrictive
             system_prompt = (
                 files("moves_cli.data").joinpath("llm_instruction.md").read_text()
             )
-            client = instructor.from_litellm(completion, mode=instructor.Mode.JSON)
+            # we're pathching the litellm with instructor to use any llm with any schema
+            client = instructor.from_litellm(
+                completion, mode=instructor.Mode.JSON
+            )  # json for better llm output quality, also afaik the instructor retries on failure for these
 
             response = client.chat.completions.create(
                 model=llm_model,
@@ -79,7 +88,7 @@ class SectionProducer:
                     },
                 ],
                 response_model=SectionsOutputModel,
-                temperature=0.2,
+                temperature=0.2,  # i've set like this for deterministic results but if i change the prompt i need to increase this
             )
             result = [item.content for item in response.sections]
             return result
@@ -87,7 +96,7 @@ class SectionProducer:
             raise RuntimeError(f"LLM call failed: {e}") from e
 
     def convert_to_yaml(self, sections: list[Section]) -> str:
-        """Section listesini YAML formatına dönüştür (folded block scalar)."""
+        # i have no idea about this writing code, but works perfect
         from io import StringIO
 
         from ruamel.yaml import YAML
@@ -95,7 +104,6 @@ class SectionProducer:
         from ruamel.yaml.scalarstring import FoldedScalarString
 
         def to_folded(content: str) -> str | FoldedScalarString:
-            """Boş değilse FoldedScalarString, boşsa düz string döner."""
             if not content or not content.strip():
                 return ""
             text = content if content.endswith("\n") else content + "\n"
@@ -121,7 +129,7 @@ class SectionProducer:
         return output.getvalue()
 
     def load_from_yaml(self, yaml_content: str) -> list[Section]:
-        """YAML içeriğinden Section listesi oluştur."""
+        # this loads the yaml content into a list of Section objects
         from io import StringIO
 
         from ruamel.yaml import YAML

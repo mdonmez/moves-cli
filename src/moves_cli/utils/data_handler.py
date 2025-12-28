@@ -8,6 +8,7 @@ class DataHandler:
     def __init__(self, data_folder: Path = DEFAULT_DATA_FOLDER):
         self.DATA_FOLDER = data_folder
 
+
     def _resolve_path(self, path: Path) -> Path:
         path = Path(path)
         if path.is_absolute():

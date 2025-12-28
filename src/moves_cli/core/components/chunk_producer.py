@@ -15,6 +15,7 @@ def generate_chunks(
     if window_size < 1:
         return []
 
+    # map one by one
     words_with_sources = [
         (word, section) for section in sections for word in section.content.split()
     ]
@@ -27,10 +28,10 @@ def generate_chunks(
 
     range_limit = n_words - window_size + 1
 
+    # create chunks with window size of words with window sliding
     for i in range(range_limit):
         window = words_with_sources[i : i + window_size]
 
-        # Unpack separated lists
         words = [w for w, _ in window]
 
         sections_dict = {s.section_index: s for _, s in window}
@@ -45,6 +46,7 @@ def generate_chunks(
                 source_sections=tuple(
                     sorted(sections_dict.values(), key=lambda s: s.section_index)
                 ),
+                # give it id to access it easily
                 chunk_id=chunk_id_generator(),
             )
         )
@@ -56,6 +58,7 @@ class CandidateChunkGenerator:
     def __init__(self, all_chunks: list[Chunk]):
         self._index: dict[int, list[Chunk]] = defaultdict(list)
 
+        # create index for candidate chunks at init for performance
         for chunk in all_chunks:
             if not chunk.source_sections:
                 continue
@@ -69,6 +72,7 @@ class CandidateChunkGenerator:
             is_single_section = len(chunk.source_sections) == 1
             single_source_idx = min_sec_idx if is_single_section else -1
 
+            # selects the chunks that are in the candidate range with not selecting the exact sides
             for idx in range(start_candidate_range, end_candidate_range + 1):
                 if is_single_section:
                     if (

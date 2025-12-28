@@ -17,12 +17,17 @@ class SimilarityCalculator:
         self.phonetic = Phonetic(all_chunks)
 
     def compare(
-        self, input_str: str, candidates: list[Chunk], current_section_index: int = 0
+        self,
+        input_str: str,
+        candidates: list[Chunk],
+        current_section_index: int = 0,  # we're getting index for tie breaking
     ) -> list[SimilarityResult]:
         if not candidates:
             return []
 
         try:
+            # the score merging logic, it is a bit complex but it works well.
+            # really balances the unfairness of phonetic and semantic scores
             semantic_results = self.semantic.compare(input_str, candidates)
             phonetic_results = self.phonetic.compare(input_str, candidates)
 
@@ -33,7 +38,6 @@ class SimilarityCalculator:
                 res.chunk.chunk_id: res.score for res in semantic_results
             }
 
-            # Use 1.0 if dict is empty or all scores are 0 (prevents division by zero)
             max_p = max(phonetic_scores.values(), default=0.0) or 1.0
             max_s = max(semantic_scores.values(), default=0.0) or 1.0
 
@@ -57,7 +61,7 @@ class SimilarityCalculator:
                     SimilarityResult(chunk=candidate, score=final_score)
                 )
 
-            # Tie-breaking: equal scores prefer closest slide on right (forward direction)
+            # for tie breaking, prefer closest slide on right (forward direction)
             final_results.sort(
                 key=lambda x: (
                     -x.score,

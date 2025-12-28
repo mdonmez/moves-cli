@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.table import Table
 
 
+# i literally have no idea how this works but it does, COMPLETELY ai generated
 def output(*args: str | dict[str, Any] | list[dict[str, Any]]) -> str:
     buf = StringIO()
     con = Console(file=buf, highlight=False, markup=False, force_terminal=True)

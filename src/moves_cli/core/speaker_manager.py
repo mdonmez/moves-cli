@@ -25,6 +25,7 @@ from moves_cli.utils.data_handler import DataHandler
 from moves_cli.utils.output_formatter import output
 
 
+# for just better ui
 class MsecondsElapsedColumn(ProgressColumn):
     def render(self, task: "Task") -> Text:
         elapsed = task.elapsed
@@ -33,6 +34,7 @@ class MsecondsElapsedColumn(ProgressColumn):
         return Text(f"{elapsed:.1f}s")
 
 
+# i will completely remove the backup things, look todo
 class SpeakerManager:
     def __init__(self, data_handler: DataHandler):
         self.data_handler = data_handler
@@ -50,7 +52,6 @@ class SpeakerManager:
         raise FileNotFoundError(f"Missing {file_type} file for speaker {speaker_label}")
 
     def _write_speaker_yaml(self, path: Path, speaker: Speaker) -> None:
-        """Speaker'ı YAML dosyasına yaz."""
         from io import StringIO
 
         from ruamel.yaml import YAML
@@ -65,7 +66,6 @@ class SpeakerManager:
         self.data_handler.write(path, output.getvalue())
 
     def _read_speaker_yaml(self, path: Path) -> Speaker:
-        """YAML dosyasından Speaker oku."""
         from io import StringIO
 
         from ruamel.yaml import YAML
@@ -86,14 +86,15 @@ class SpeakerManager:
         current_speakers = self.list()
         speaker_ids = [speaker.speaker_id for speaker in current_speakers]
 
-        # Check 1: Prevent name collision with existing IDs (security/UX)
+        # revent name collision with existing ids
         if name in speaker_ids:
             raise ValueError(
                 f"Speaker name '{name}' conflicts with an existing speaker ID. "
                 f"Please choose a different name."
             )
 
-        # Check 2: Generate unique speaker ID with collision detection
+        # generate unique speaker id with collision detection. maybe it needs
+        # very long iterations to conflict but idk, just few more lines
         from moves_cli.config import SPEAKER_ID_GENERATION_MAX_RETRIES
 
         speaker_id = None
@@ -106,7 +107,7 @@ class SpeakerManager:
         if speaker_id is None:
             raise RuntimeError(
                 f"Failed to generate unique speaker ID after {SPEAKER_ID_GENERATION_MAX_RETRIES} attempts. "
-                f"This is extremely rare - please try again."
+                f"This is extremely rare - please try again."  # ohhh, yes, the line that probably will never be reached
             )
 
         speaker_path = self.SPEAKERS_PATH / speaker_id
@@ -116,6 +117,8 @@ class SpeakerManager:
             source_presentation=source_presentation.resolve(),
             source_transcript=source_transcript.resolve(),
         )
+
+        # very understandable i think
 
         self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
         return speaker
@@ -139,7 +142,8 @@ class SpeakerManager:
     def resolve(self, speaker_pattern: str) -> Speaker:
         speakers = self.list()
 
-        # Build lookup dicts - O(n) once
+        # the optimization is made with llm in here
+        # O(n) once
         by_id: dict[str, Speaker] = {}
         by_name: dict[str, list[Speaker]] = {}
         for speaker in speakers:
@@ -211,6 +215,8 @@ class SpeakerManager:
             MsecondsElapsedColumn(),
             transient=True,
         ) as progress:
+            # i have no idea what is sigint but i know its for direct stop the llm generation
+            # maybe there is built-in solution in litellm or instructor, look into it
             # Install SIGINT handler to force exit on Ctrl+C
             original_sigint = signal.getsignal(signal.SIGINT)
 
@@ -241,6 +247,8 @@ class SpeakerManager:
                 progress.start_task(task_id)
                 start_time = time.perf_counter()
                 progress_callback("Starting...")
+
+                # these also will be removed, backups etc.
 
                 backup_presentation = speaker_path / "presentation.pdf"
                 backup_transcript = speaker_path / "transcript.pdf"
@@ -364,6 +372,7 @@ class SpeakerManager:
                 signal.signal(signal.SIGINT, original_sigint)
 
     def delete(self, speaker: Speaker) -> bool:
+        # the most minimal thing
         speaker_path = self.SPEAKERS_PATH / speaker.speaker_id
         result = bool(self.data_handler.delete(speaker_path))
         return result

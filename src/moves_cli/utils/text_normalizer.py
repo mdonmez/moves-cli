@@ -41,6 +41,7 @@ def _convert_number(match: re.Match) -> str:
         return match.group(0)
 
 
+# mode is here because speed matters in the live control
 def normalize_text(text: str, mode: NormalizationMode = NormalizationMode.LIVE) -> str:
     if not text:
         return ""

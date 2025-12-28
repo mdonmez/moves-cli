@@ -6,6 +6,8 @@ from moves_cli.models import Chunk, SimilarityResult
 
 class Phonetic:
     def __init__(self, all_chunks: list[Chunk]) -> None:
+        # we're using this calculation at init to make o(1) lookups possible with dictionary instead of
+        # doing it every time, that's huge performance boost
         self._phonetic_codes: dict[str, str] = {
             chunk.chunk_id: metaphone(chunk.partial_content).replace(" ", "")
             for chunk in all_chunks
@@ -30,6 +32,7 @@ class Phonetic:
                 processor=None,
             )
 
+            # return with x.y format instead of 0-100
             return [
                 SimilarityResult(chunk=candidates[index], score=score / 100.0)
                 for _, score, index in raw_results

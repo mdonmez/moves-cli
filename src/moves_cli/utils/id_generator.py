@@ -14,6 +14,7 @@ def generate_chunk_id() -> str:
 def generate_speaker_id(name: str) -> str:
     ascii_name = unidecode(name)
 
+    # slugify
     slug = (
         re.sub(
             r"\s+",

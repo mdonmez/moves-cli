@@ -8,8 +8,8 @@ from moves_cli.config import DATA_FOLDER, SECTIONS_FILENAME, SPEAKER_FILENAME
 class NormalizationMode(StrEnum):
     """Text normalization mode for different use cases."""
 
-    LIVE = "live"  # Fast path: skip num2words (STT outputs words)
-    PREPROCESS = "preprocess"  # Full normalization with num2words
+    LIVE = "live"  # skip num2words
+    PREPROCESS = "preprocess"  # full
 
 
 @dataclass(frozen=True)
@@ -23,7 +23,8 @@ class Chunk:
     partial_content: str
     source_sections: tuple[
         Section, ...
-    ]  # Tuple ensures true immutability (frozen=True only prevents reassignment), this is why we use tuple instead of list
+    ]  # tuple ensures true immutability (frozen=True only prevents reassignment), this
+    # is why we use tuple instead of list, maybe i can switch to list in the future idk really
     chunk_id: str
 
 
@@ -35,6 +36,7 @@ class Speaker:
     source_transcript: Path
     last_processed: str | None = None
 
+    # useful properties
     @property
     def label(self) -> str:
         return f"{self.name} ({self.speaker_id})"
@@ -82,13 +84,15 @@ class MlModel:
     model_dir: Path
 
 
+# they're very critical for the app to work. don't touch them unless
+# you changed the model and the calculated its hash manually
 EmbeddingModel = MlModel(
     name="sentence-transformers/all-MiniLM-l6-v2",
     base_url="https://github.com/mdonmez/moves-cli/raw/refs/heads/master/src/moves_cli/data/ml_models/all-MiniLM-L6-v2_quint8_avx2",
     files={
-        "model.onnx": "e0def985059c9db8",
-        "config.json": "ef5a8e793fd9b2f9",
-        "special_tokens_map.json": "93a083cd86fe86e1",
+        "model.onnx": "e0def985059c9db8",  # xxh3_64 hash
+        "config.json": "ef5a8e793fd9b2f9",  # xxhash because blazingly fast and they're calculated everytime when control starts
+        "special_tokens_map.json": "93a083cd86fe86e1",  # also in future xxhash will be used for presentation, transcript and sections files.
         "tokenizer.json": "9a86f184b2242391",
         "tokenizer_config.json": "829f09aa4433a19d",
     },
@@ -99,7 +103,7 @@ SttModel = MlModel(
     name="sherpa-onnx-nemo-streaming-fast-conformer-transducer-en-480ms",
     base_url="https://github.com/mdonmez/moves-cli/raw/refs/heads/master/src/moves_cli/data/ml_models/nemo-streaming-stt-480ms-int8",
     files={
-        "decoder.int8.onnx": "f2751a7feca481bc",
+        "decoder.int8.onnx": "f2751a7feca481bc",  # xxh3_64 hash
         "encoder.int8.onnx": "bebeb28d3df4dfae",
         "joiner.int8.onnx": "84a3ae887bf7b986",
         "tokens.txt": "14f59574d9b3e62f",

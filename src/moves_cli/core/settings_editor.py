@@ -10,6 +10,7 @@ from moves_cli.utils.data_handler import DataHandler
 class SettingsEditor:
     def __init__(self, data_handler: DataHandler):
         self.data_handler = data_handler
+        # im using toml in here because it is better than yaml and json for this use case
         self.settings = self.data_handler.DATA_FOLDER / "settings.toml"
 
         self._template_defaults: dict[str, Any] = {
@@ -27,6 +28,7 @@ class SettingsEditor:
         self._save()
 
     def _save(self) -> bool:
+        # this is self-healing config saver
         try:
             self.settings.parent.mkdir(parents=True, exist_ok=True)
 
