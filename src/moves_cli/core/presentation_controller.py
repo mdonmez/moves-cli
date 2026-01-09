@@ -8,12 +8,12 @@ import typer
 
 import sounddevice as sd
 from pynput.keyboard import Controller, Key
-from sherpa_onnx import OnlineRecognizer
+from sherpa_onnx import OnlineRecognizer, VadModelConfig, VoiceActivityDetector
 
 from moves_cli.config import SIMILARITY_THRESHOLD, WINDOW_SIZE
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
-from moves_cli.models import Section, SttModel
+from moves_cli.models import Section, SttModel, VadModel
 from moves_cli.utils import model_preparer, text_normalizer
 
 
@@ -31,6 +31,15 @@ class PresentationController:
     THREAD_JOIN_TIMEOUT: float = 2.0
     SHUTDOWN_CHECK_INTERVAL: float = 0.5
     MODEL_DIR: Path = SttModel.model_dir
+    VAD_MODEL_DIR: Path = VadModel.model_dir
+    # VAD configuration (optimized for noisy environments like 1000+ person venues)
+    VAD_THRESHOLD: float = 0.5  # Higher = less sensitive (filters clicks/noise)
+    VAD_MIN_SILENCE: float = 0.3  # Seconds of silence to end speech segment
+    VAD_MIN_SPEECH: float = (
+        0.15  # Minimum speech duration to detect (filters short noises)
+    )
+    VAD_WINDOW_SIZE: int = 512  # ~32ms analysis window at 16kHz
+    VAD_BUFFER_SIZE: float = 30.0  # Circular buffer size in seconds
     # from config.py
     SIMILARITY_THRESHOLD: float = SIMILARITY_THRESHOLD
     WINDOW_SIZE: int = WINDOW_SIZE
@@ -56,10 +65,33 @@ class PresentationController:
                 f"Failed to load STT model from {self.MODEL_DIR}: {e}"
             ) from e
 
+        # Initialize VAD for filtering background noise in crowded environments
+        try:
+            vad_config = VadModelConfig()
+            vad_config.silero_vad.model = str(
+                self.VAD_MODEL_DIR / "silero_vad.int8.onnx"
+            )
+            vad_config.sample_rate = self.SAMPLE_RATE
+            vad_config.silero_vad.threshold = self.VAD_THRESHOLD
+            vad_config.silero_vad.min_silence_duration = self.VAD_MIN_SILENCE
+            vad_config.silero_vad.min_speech_duration = self.VAD_MIN_SPEECH
+            vad_config.silero_vad.window_size = self.VAD_WINDOW_SIZE
+
+            self.vad = VoiceActivityDetector(
+                vad_config, buffer_size_in_seconds=self.VAD_BUFFER_SIZE
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to load VAD model from {self.VAD_MODEL_DIR}: {e}"
+            ) from e
+
         self.window_size = window_size
         self.sections = sections
         self.section_lock = threading.Lock()
         self.shutdown_flag = threading.Event()
+
+        # VAD status flag for display (atomic bool via Event for thread-safety)
+        self._vad_active = threading.Event()
 
         with self.section_lock:
             self.current_section = sections[0]
@@ -83,10 +115,28 @@ class PresentationController:
         )
 
     def _audio_sampler_callback(self, indata, _frames, _time, _status) -> None:
-        # this just puts the audio data into a queue for processing
-        if not self.audio_queue.full():
-            with suppress(Full):
-                self.audio_queue.put_nowait(indata[:, 0].copy())
+        """VAD-gated audio sampling: only speech passes to STT."""
+        samples = indata[:, 0].copy()
+
+        # Feed samples to VAD for speech detection
+        self.vad.accept_waveform(samples)
+
+        # Update VAD status flag for display
+        is_speech = self.vad.is_speech_detected()
+        if is_speech:
+            self._vad_active.set()
+        else:
+            self._vad_active.clear()
+
+        # Print VAD status every 100ms (inline overwrite with \r)
+        vad_status = "🎙️ SPEECH" if is_speech else "🔇 SILENT"
+        print(f"\r[VAD] {vad_status}  ", end="", flush=True)
+
+        # Only send to STT if speech is detected (filters crowd noise, coughs, applause)
+        if is_speech:
+            if not self.audio_queue.full():
+                with suppress(Full):
+                    self.audio_queue.put_nowait(samples)
 
     def _stt_processor_task(self) -> None:
         stream = self.recognizer.create_stream()
@@ -168,8 +218,13 @@ class PresentationController:
                 match_words = best_chunk.partial_content.strip().split()
                 match_preview = " ".join(match_words[-self.DISPLAY_WORD_COUNT :])
 
+                # VAD status indicator
+                vad_indicator = "🎙️" if self._vad_active.is_set() else "🔇"
+
+                # Clear inline VAD status line before printing full output
+                print("\r" + " " * 20 + "\r", end="", flush=True)
                 typer.echo(
-                    f"{slide_position} | {similarity_pct} | {status}\n"
+                    f"{slide_position} | {similarity_pct} | {status} | {vad_indicator}\n"
                     f"    Speech → ...{speech_preview}\n"
                     f"    Match  → ...{match_preview}\n"
                 )

@@ -14,12 +14,12 @@ from rich.progress import (
     TextColumn,
 )
 
-from moves_cli.models import EmbeddingModel, SttModel
+from moves_cli.models import EmbeddingModel, SttModel, VadModel
 
 CHUNK_SIZE = 1024 * 1024
 HTTP_TIMEOUT = 30.0
 MAX_CONCURRENT_DOWNLOADS = 4
-MODELS = [EmbeddingModel, SttModel]
+MODELS = [EmbeddingModel, SttModel, VadModel]
 
 console = Console(highlight=False, color_system=None)
 

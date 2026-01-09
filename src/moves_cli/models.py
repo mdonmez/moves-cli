@@ -110,3 +110,12 @@ SttModel = MlModel(
     },
     model_dir=DATA_FOLDER / "ml_models" / "nemo-streaming-stt-480ms-int8",
 )
+
+VadModel = MlModel(
+    name="silero-vad-int8",
+    base_url="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models",
+    files={
+        "silero_vad.int8.onnx": "5dfdb9b6aa189508",  # xxh3_64 hash, ~208KB
+    },
+    model_dir=DATA_FOLDER / "ml_models" / "silero-vad-int8",
+)
