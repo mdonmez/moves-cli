@@ -15,7 +15,9 @@ class SectionProducer:
         self, pdf_path: Path, extraction_type: Literal["transcript", "presentation"]
     ) -> str:
         try:
-            with pymupdf.open(pdf_path) as doc:
+            # Read file into memory first (snapshot) - protects against file changes/deletion
+            data = pdf_path.read_bytes()
+            with pymupdf.open(stream=data, filetype="pdf") as doc:
                 match extraction_type:
                     case "transcript":
                         # extract all text from pdf and remove extra spaces, one line full text just.
@@ -39,6 +41,25 @@ class SectionProducer:
         except Exception as e:
             raise RuntimeError(
                 f"PDF extraction failed for {pdf_path} ({extraction_type}): {e}"
+            ) from e
+
+    def generate_template(self, presentation_path: Path) -> list[Section]:
+        """
+        Extract slide count from presentation PDF and generate empty sections.
+        No LLM call, fully offline.
+        """
+        try:
+            # Read file into memory first (snapshot)
+            data = presentation_path.read_bytes()
+            with pymupdf.open(stream=data, filetype="pdf") as doc:
+                slide_count = len(doc)
+
+            return [
+                Section(section_index=i + 1, content="") for i in range(slide_count)
+            ]
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to generate template from {presentation_path}: {e}"
             ) from e
 
     def estimate_for_files(

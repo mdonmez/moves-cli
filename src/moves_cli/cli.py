@@ -255,30 +255,50 @@ def speaker_process(
     speakers: Optional[list[str]] = typer.Argument(None, help="Speaker(s) to process"),
     all: bool = typer.Option(False, "--all", "-a", help="Process all speakers"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+    manual: bool = typer.Option(
+        False,
+        "--manual",
+        "-m",
+        help="Generate empty template without LLM (offline mode)",
+    ),
 ):
-    """Process the speaker to get ready for the control (requires LLM model and API key)"""
+    """Process the speaker to get ready for the control (use --manual for offline template generation)"""
     try:
         # Get instances
         speaker_manager = speaker_manager_instance()
         settings_editor = settings_editor_instance()
 
-        # Get LLM configuration
+        # Get LLM configuration (only required in auto mode)
         settings = settings_editor.list()
+        llm_model = None
+        llm_api_key = None
 
-        # Validate LLM settings
-        if not settings.model:
-            typer.echo(
-                "Error: LLM model not configured. Use 'moves settings set model <model>' to configure.",
-                err=True,
-            )
-            raise typer.Exit(1)
+        if not manual:
+            # Validate LLM settings (auto mode only)
+            if not settings.model:
+                typer.echo(
+                    "Error: LLM model not configured. Use 'moves settings set model <model>' to configure.",
+                    err=True,
+                )
+                typer.echo(
+                    "Tip: Use --manual flag to generate a template without LLM.",
+                    err=True,
+                )
+                raise typer.Exit(1)
 
-        if not settings.key:
-            typer.echo(
-                "Error: LLM API key not configured. Use 'moves settings set key <key>' to configure.",
-                err=True,
-            )
-            raise typer.Exit(1)
+            if not settings.key:
+                typer.echo(
+                    "Error: LLM API key not configured. Use 'moves settings set key <key>' to configure.",
+                    err=True,
+                )
+                typer.echo(
+                    "Tip: Use --manual flag to generate a template without LLM.",
+                    err=True,
+                )
+                raise typer.Exit(1)
+
+            llm_model = settings.model
+            llm_api_key = settings.key
 
         # Resolve speakers
         if all:
@@ -304,35 +324,60 @@ def speaker_process(
         # Call speaker_manager.process with resolved speakers
         results = asyncio.run(
             speaker_manager.process(
-                resolved_speakers, settings.model, settings.key, skip_confirmation=yes
+                resolved_speakers,
+                llm_model=llm_model,
+                llm_api_key=llm_api_key,
+                skip_confirmation=yes,
+                manual_mode=manual,
             )
         )
 
-        # Display results in Direct Summary format
+        # Display results
         if len(resolved_speakers) == 1:
             result = results[0]
             speaker = resolved_speakers[0]
             typer.echo(f"Speaker {speaker.label} processed.")
             typer.echo()
-            typer.echo(
-                f"{result.section_count} sections have been created in {result.processing_time_seconds:.1f} seconds."
-            )
+            if manual:
+                typer.echo(
+                    f"{result.section_count} empty sections created. Edit sections.yaml to add speech content."
+                )
+                typer.echo()
+                typer.echo(f"File: {speaker.sections_file}")
+            else:
+                typer.echo(
+                    f"{result.section_count} sections have been created in {result.processing_time_seconds:.1f} seconds."
+                )
         else:
             typer.echo(f"{len(resolved_speakers)} speakers processed.")
-
-            # Display detailed results for all speakers
-            total_time = sum(result.processing_time_seconds for result in results)
-            results_dict = {}
-            for i, result in enumerate(results):
-                speaker = resolved_speakers[i]
-                results_dict[speaker.label] = (
-                    f"{result.section_count} sections ({result.processing_time_seconds:.1f}s)"
-                )
-
-            typer.echo(output(None, results_dict))
-
             typer.echo()
-            typer.echo(f"Processing time took {total_time:.1f} seconds in total.")
+
+            if manual:
+                # Manual mode: show section counts and file paths
+                for i, result in enumerate(results):
+                    speaker = resolved_speakers[i]
+                    typer.echo(
+                        f"  {speaker.label}: {result.section_count} empty sections"
+                    )
+                    typer.echo(f"    File: {speaker.sections_file}")
+                    if i < len(results) - 1:
+                        typer.echo()
+
+                typer.echo()
+                typer.echo("Edit sections.yaml files to add speech content.")
+            else:
+                # Auto mode: show section counts with timing
+                total_time = sum(result.processing_time_seconds for result in results)
+                results_dict = {}
+                for i, result in enumerate(results):
+                    speaker = resolved_speakers[i]
+                    results_dict[speaker.label] = (
+                        f"{result.section_count} sections ({result.processing_time_seconds:.1f}s)"
+                    )
+
+                typer.echo(output(None, results_dict))
+                typer.echo()
+                typer.echo(f"Total processing time: {total_time:.1f} seconds.")
 
     except typer.Exit:
         raise
@@ -554,6 +599,22 @@ def presentation_control(
         if not sections:
             typer.echo("Error: No sections found in processed data.", err=True)
             raise typer.Exit(1)
+
+        # Check for empty sections (unfilled template from manual mode)
+        empty_sections = [s for s in sections if not s.content.strip()]
+        if empty_sections:
+            typer.echo(
+                f"Warning: {len(empty_sections)} of {len(sections)} sections have empty content.",
+                err=True,
+            )
+            typer.echo(
+                "These slides will not respond to voice navigation.",
+                err=True,
+            )
+            typer.echo()
+            if not typer.confirm("Continue anyway?", default=False):
+                raise typer.Abort()
+            typer.echo()
 
         window_size = WINDOW_SIZE
 

@@ -167,9 +167,10 @@ class SpeakerManager:
     async def process(
         self,
         speakers: list[Speaker],
-        llm_model: str,
-        llm_api_key: str,
+        llm_model: str | None = None,
+        llm_api_key: str | None = None,
         skip_confirmation: bool = False,
+        manual_mode: bool = False,
     ) -> list[ProcessResult]:
         speaker_paths = [
             self.SPEAKERS_PATH / speaker.speaker_id for speaker in speakers
@@ -178,7 +179,7 @@ class SpeakerManager:
         typer.echo(f"Processing {len(speakers)} speaker(s).")
         typer.echo()
 
-        # Collect estimation results with spinner
+        # Collect estimation results with spinner (only in auto mode)
         estimation_results: list[tuple[Speaker, int, int, float | None]] = []
 
         with Progress(
@@ -188,15 +189,21 @@ class SpeakerManager:
         ) as preflight_progress:
             preflight_progress.add_task(description="Preparing...", total=None)
 
+            # Import section producer here - lazy import overhead shown as "Preparing..."
+            from moves_cli.core.components.section_producer import SectionProducer
+
+            section_producer = SectionProducer()
+
             for speaker in speakers:
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
 
-                # Validate source files exist (no backup fallback)
+                # Validate source files exist
+                # Manual mode only needs presentation, auto mode needs both
                 missing_files = []
                 if not source_presentation.exists():
                     missing_files.append(f"Presentation: {source_presentation}")
-                if not source_transcript.exists():
+                if not manual_mode and not source_transcript.exists():
                     missing_files.append(f"Transcript: {source_transcript}")
 
                 if missing_files:
@@ -206,63 +213,102 @@ class SpeakerManager:
                         + "\n\nPlease update file paths with 'moves speaker edit' command."
                     )
 
-                # Estimate tokens and cost before LLM call
-                from moves_cli.core.components.section_producer import SectionProducer
+                # Estimate tokens and cost before LLM call (auto mode only)
+                if not manual_mode:
+                    slide_count, token_count, estimated_cost = (
+                        section_producer.estimate_for_files(
+                            presentation_path=source_presentation,
+                            transcript_path=source_transcript,
+                            llm_model=llm_model,  # type: ignore
+                        )
+                    )
 
-                section_producer = SectionProducer()
-                slide_count, token_count, estimated_cost = (
-                    section_producer.estimate_for_files(
-                        presentation_path=source_presentation,
-                        transcript_path=source_transcript,
-                        llm_model=llm_model,
+                    estimation_results.append(
+                        (speaker, slide_count, token_count, estimated_cost)
+                    )
+
+        # Display estimation results (auto mode only)
+        if not manual_mode:
+            for idx, (speaker, slide_count, token_count, estimated_cost) in enumerate(
+                estimation_results
+            ):
+                # Format cost string
+                if estimated_cost is not None:
+                    cost_str = f"~${estimated_cost:.4f}"
+                else:
+                    cost_str = "N/A"
+
+                typer.echo(
+                    output(
+                        speaker.label,
+                        {
+                            "Presentation": f"{speaker.source_presentation} ({slide_count} slides)",
+                            "Transcript": speaker.source_transcript,
+                            "Estimated tokens": f"~{token_count:,}",
+                            "Estimated cost": f"{cost_str} ({llm_model})",
+                        },
                     )
                 )
 
-                estimation_results.append(
-                    (speaker, slide_count, token_count, estimated_cost)
-                )
+                # Add blank line between speakers (not after the last one)
+                if idx < len(estimation_results) - 1:
+                    typer.echo()
 
-        # Display estimation results
-        for idx, (speaker, slide_count, token_count, estimated_cost) in enumerate(
-            estimation_results
-        ):
-            # Format cost string
-            if estimated_cost is not None:
-                cost_str = f"~${estimated_cost:.4f}"
-            else:
-                cost_str = "N/A"
-
-            typer.echo(
-                output(
-                    speaker.label,
-                    {
-                        "Presentation": f"{speaker.source_presentation} ({slide_count} slides)",
-                        "Transcript": speaker.source_transcript,
-                        "Estimated tokens": f"~{token_count:,}",
-                        "Estimated cost": f"{cost_str} ({llm_model})",
-                    },
-                )
-            )
-
-            # Add blank line between speakers (not after the last one)
-            if idx < len(estimation_results) - 1:
-                typer.echo()
-
-        typer.echo()
-
-        if not skip_confirmation:
-            typer.confirm("Proceed?", default=True, abort=True)
             typer.echo()
 
-        # Use rich progress for dynamic feedback
+            if not skip_confirmation:
+                typer.confirm("Proceed?", default=True, abort=True)
+                typer.echo()
+
+        # Manual mode: simple synchronous processing (no delays, no per-speaker progress)
+        if manual_mode:
+            results: list[ProcessResult] = []
+            for speaker, speaker_path in zip(speakers, speaker_paths):
+                import time
+
+                start_time = time.perf_counter()
+
+                # Compute presentation hash
+                presentation_hash = self.compute_file_hash(speaker.source_presentation)
+
+                # Generate template
+                sections = section_producer.generate_template(
+                    presentation_path=speaker.source_presentation,
+                )
+
+                # Write sections file
+                self.data_handler.write(
+                    speaker_path / SECTIONS_FILENAME,
+                    section_producer.convert_to_yaml(sections),
+                )
+
+                processing_time = time.perf_counter() - start_time
+
+                # Update speaker metadata
+                speaker.last_processed = datetime.now().isoformat()
+                speaker.presentation_hash = presentation_hash
+                speaker.transcript_hash = None
+                sections_hash = self.compute_file_hash(speaker_path / SECTIONS_FILENAME)
+                speaker.sections_hash = sections_hash
+                self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
+
+                results.append(
+                    ProcessResult(
+                        section_count=len(sections),
+                        speaker_id=speaker.speaker_id,
+                        processing_time_seconds=processing_time,
+                    )
+                )
+
+            return results
+
+        # Auto mode: async parallel processing with progress feedback
         with Progress(
             SpinnerColumn(style=""),
             TextColumn("{task.description}"),
             MsecondsElapsedColumn(),
             transient=True,
         ) as progress:
-            # i have no idea what is sigint but i know its for direct stop the llm generation
-            # maybe there is built-in solution in litellm or instructor, look into it
             # Install SIGINT handler to force exit on Ctrl+C
             original_sigint = signal.getsignal(signal.SIGINT)
 
@@ -292,9 +338,8 @@ class SpeakerManager:
 
                 progress.start_task(task_id)
                 start_time = time.perf_counter()
-                progress_callback("Starting...")
 
-                # Compute hashes before copying (for change detection)
+                # Compute hashes (for change detection)
                 progress_callback("Computing file hashes...")
                 presentation_hash = await asyncio.to_thread(
                     self.compute_file_hash, source_presentation
@@ -303,86 +348,57 @@ class SpeakerManager:
                     self.compute_file_hash, source_transcript
                 )
 
-                # Copy to temp directory for atomic/safe processing
-                import shutil
-                import tempfile
+                # Run LLM generation in a daemon thread so it doesn't block sys.exit()
+                loop = asyncio.get_running_loop()
+                future = loop.create_future()
 
-                temp_dir = Path(tempfile.mkdtemp(prefix="moves_"))
-                try:
-                    progress_callback("Copying files to temp...")
-                    presentation_path = temp_dir / "presentation.pdf"
-                    transcript_path = temp_dir / "transcript.pdf"
+                def run_generation() -> None:
+                    try:
+                        result = section_producer.generate_sections(
+                            presentation_path=source_presentation,
+                            transcript_path=source_transcript,
+                            llm_model=llm_model,  # type: ignore
+                            llm_api_key=llm_api_key,  # type: ignore
+                            callback=progress_callback,
+                        )
+                        loop.call_soon_threadsafe(future.set_result, result)
+                    except Exception as e:
+                        loop.call_soon_threadsafe(future.set_exception, e)
 
-                    await asyncio.to_thread(
-                        shutil.copy2, source_presentation, presentation_path
-                    )
-                    await asyncio.to_thread(
-                        shutil.copy2, source_transcript, transcript_path
-                    )
+                # Daemon thread dies when main process exits
+                thread = threading.Thread(target=run_generation, daemon=True)
+                thread.start()
 
-                    from moves_cli.core.components.section_producer import (
-                        SectionProducer,
-                    )
+                sections = await future
 
-                    section_producer = SectionProducer()
+                progress_callback("Writing to file...")
+                self.data_handler.write(
+                    speaker_path / SECTIONS_FILENAME,
+                    section_producer.convert_to_yaml(sections),
+                )
 
-                    # Run generation in a daemon thread so it doesn't block sys.exit()
-                    loop = asyncio.get_running_loop()
-                    future = loop.create_future()
+                processing_time = time.perf_counter() - start_time
 
-                    def run_generation() -> None:
-                        try:
-                            result = section_producer.generate_sections(
-                                presentation_path=presentation_path,
-                                transcript_path=transcript_path,
-                                llm_model=llm_model,
-                                llm_api_key=llm_api_key,
-                                callback=progress_callback,
-                            )
-                            loop.call_soon_threadsafe(future.set_result, result)
-                        except Exception as e:
-                            loop.call_soon_threadsafe(future.set_exception, e)
+                # Update progress to show Done and freeze timer
+                progress.update(
+                    task_id,
+                    description=f"Processing {speaker.label}... Done",
+                )
+                progress.stop_task(task_id)
 
-                    # Daemon thread dies when main process exits
-                    thread = threading.Thread(target=run_generation, daemon=True)
-                    thread.start()
+                # Update speaker metadata with timestamp and hashes
+                speaker.last_processed = datetime.now().isoformat()
+                speaker.presentation_hash = presentation_hash
+                speaker.transcript_hash = transcript_hash
+                sections_hash = self.compute_file_hash(speaker_path / SECTIONS_FILENAME)
+                speaker.sections_hash = sections_hash
+                self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
 
-                    sections = await future
-
-                    progress_callback("Writing to file...")
-                    self.data_handler.write(
-                        speaker_path / SECTIONS_FILENAME,
-                        section_producer.convert_to_yaml(sections),
-                    )
-
-                    processing_time = time.perf_counter() - start_time
-
-                    # Update progress to show Done and freeze timer
-                    progress.update(
-                        task_id,
-                        description=f"Processing {speaker.label}... Done",
-                    )
-                    progress.stop_task(task_id)
-
-                    # Update speaker metadata with timestamp and hashes
-                    speaker.last_processed = datetime.now().isoformat()
-                    speaker.presentation_hash = presentation_hash
-                    speaker.transcript_hash = transcript_hash
-                    # Compute sections hash after writing
-                    sections_hash = self.compute_file_hash(
-                        speaker_path / SECTIONS_FILENAME
-                    )
-                    speaker.sections_hash = sections_hash
-                    self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
-
-                    return ProcessResult(
-                        section_count=len(sections),
-                        speaker_id=speaker.speaker_id,
-                        processing_time_seconds=processing_time,
-                    )
-                finally:
-                    # Clean up temp directory
-                    await asyncio.to_thread(shutil.rmtree, temp_dir, ignore_errors=True)
+                return ProcessResult(
+                    section_count=len(sections),
+                    speaker_id=speaker.speaker_id,
+                    processing_time_seconds=processing_time,
+                )
 
             tasks = []
             try:
