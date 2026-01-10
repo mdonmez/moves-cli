@@ -41,6 +41,52 @@ class SectionProducer:
                 f"PDF extraction failed for {pdf_path} ({extraction_type}): {e}"
             ) from e
 
+    def estimate_for_files(
+        self,
+        presentation_path: Path,
+        transcript_path: Path,
+        llm_model: str,
+    ) -> tuple[int, int, float | None]:
+        """
+        Estimate token count and cost for given files without making LLM call.
+
+        Returns:
+            tuple: (slide_count, token_count, estimated_cost_usd or None)
+        """
+        from litellm import cost_per_token, token_counter
+
+        # Extract data from PDFs
+        presentation_data = self._extract_pdf(presentation_path, "presentation")
+        transcript_data = self._extract_pdf(transcript_path, "transcript")
+
+        # Count slides
+        slide_count = len(presentation_data.split("\n\n"))
+
+        # Build messages for token counting
+        system_prompt = (
+            files("moves_cli.data").joinpath("llm_instruction.md").read_text()
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": f"Presentation: {presentation_data}\nTranscript: {transcript_data}",
+            },
+        ]
+
+        # Count tokens (local, free)
+        token_count = token_counter(model=llm_model, messages=messages)
+
+        # Estimate cost (local lookup, free)
+        try:
+            prompt_cost, _ = cost_per_token(
+                model=llm_model, prompt_tokens=token_count, completion_tokens=0
+            )
+        except Exception:
+            prompt_cost = None  # Model pricing not available
+
+        return slide_count, token_count, prompt_cost
+
     def _call_llm(
         self,
         presentation_data: str,

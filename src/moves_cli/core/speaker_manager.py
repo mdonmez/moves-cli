@@ -178,33 +178,75 @@ class SpeakerManager:
         typer.echo(f"Processing {len(speakers)} speaker(s).")
         typer.echo()
 
-        for speaker in speakers:
-            source_presentation = speaker.source_presentation
-            source_transcript = speaker.source_transcript
+        # Collect estimation results with spinner
+        estimation_results: list[tuple[Speaker, int, int, float | None]] = []
 
-            # Validate source files exist (no backup fallback)
-            missing_files = []
-            if not source_presentation.exists():
-                missing_files.append(f"Presentation: {source_presentation}")
-            if not source_transcript.exists():
-                missing_files.append(f"Transcript: {source_transcript}")
+        with Progress(
+            SpinnerColumn(style=""),
+            TextColumn("{task.description}"),
+            transient=True,
+        ) as preflight_progress:
+            preflight_progress.add_task(description="Preparing...", total=None)
 
-            if missing_files:
-                raise FileNotFoundError(
-                    f"Missing source files for speaker {speaker.label}:\n"
-                    + "\n".join(f"  - {f}" for f in missing_files)
-                    + "\n\nPlease update file paths with 'moves speaker edit' command."
+            for speaker in speakers:
+                source_presentation = speaker.source_presentation
+                source_transcript = speaker.source_transcript
+
+                # Validate source files exist (no backup fallback)
+                missing_files = []
+                if not source_presentation.exists():
+                    missing_files.append(f"Presentation: {source_presentation}")
+                if not source_transcript.exists():
+                    missing_files.append(f"Transcript: {source_transcript}")
+
+                if missing_files:
+                    raise FileNotFoundError(
+                        f"Missing source files for speaker {speaker.label}:\n"
+                        + "\n".join(f"  - {f}" for f in missing_files)
+                        + "\n\nPlease update file paths with 'moves speaker edit' command."
+                    )
+
+                # Estimate tokens and cost before LLM call
+                from moves_cli.core.components.section_producer import SectionProducer
+
+                section_producer = SectionProducer()
+                slide_count, token_count, estimated_cost = (
+                    section_producer.estimate_for_files(
+                        presentation_path=source_presentation,
+                        transcript_path=source_transcript,
+                        llm_model=llm_model,
+                    )
                 )
+
+                estimation_results.append(
+                    (speaker, slide_count, token_count, estimated_cost)
+                )
+
+        # Display estimation results
+        for idx, (speaker, slide_count, token_count, estimated_cost) in enumerate(
+            estimation_results
+        ):
+            # Format cost string
+            if estimated_cost is not None:
+                cost_str = f"~${estimated_cost:.4f}"
+            else:
+                cost_str = "N/A"
 
             typer.echo(
                 output(
                     speaker.label,
                     {
-                        "Presentation": source_presentation,
-                        "Transcript": source_transcript,
+                        "Presentation": f"{speaker.source_presentation} ({slide_count} slides)",
+                        "Transcript": speaker.source_transcript,
+                        "Estimated tokens": f"~{token_count:,}",
+                        "Estimated cost": f"{cost_str} ({llm_model})",
                     },
                 )
             )
+
+            # Add blank line between speakers (not after the last one)
+            if idx < len(estimation_results) - 1:
+                typer.echo()
 
         typer.echo()
 
