@@ -448,6 +448,101 @@ def presentation_control(
             )
             raise typer.Exit(1)
 
+        # Validate source files exist (no silent fallback to stale data)
+        missing_files = []
+        if not resolved_speaker.source_presentation.exists():
+            missing_files.append(
+                f"Presentation: {resolved_speaker.source_presentation}"
+            )
+        if not resolved_speaker.source_transcript.exists():
+            missing_files.append(f"Transcript: {resolved_speaker.source_transcript}")
+
+        if missing_files:
+            typer.echo(
+                f"Error: Missing source files for speaker {resolved_speaker.label}:",
+                err=True,
+            )
+            for f in missing_files:
+                typer.echo(f"  - {f}", err=True)
+            typer.echo(
+                "\nPlease update file paths with 'moves speaker edit' command.",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        # Check if source files have changed since last processing (hash comparison)
+        from moves_cli.core.speaker_manager import SpeakerManager
+
+        files_changed = []
+        if resolved_speaker.presentation_hash:
+            current_pres_hash = SpeakerManager.compute_file_hash(
+                resolved_speaker.source_presentation
+            )
+            if current_pres_hash != resolved_speaker.presentation_hash:
+                files_changed.append("Presentation")
+
+        if resolved_speaker.transcript_hash:
+            current_trans_hash = SpeakerManager.compute_file_hash(
+                resolved_speaker.source_transcript
+            )
+            if current_trans_hash != resolved_speaker.transcript_hash:
+                files_changed.append("Transcript")
+
+        if files_changed:
+            typer.echo(
+                "Warning: The following source files have changed since last processing:",
+                err=True,
+            )
+            for f in files_changed:
+                typer.echo(f"  - {f}", err=True)
+            typer.echo(
+                "\nYou may be using outdated section data. Consider re-processing with:",
+                err=True,
+            )
+            typer.echo(
+                f"  moves speaker process {resolved_speaker.speaker_id}",
+                err=True,
+            )
+            typer.echo()
+            if not typer.confirm("Continue anyway?", default=False):
+                raise typer.Abort()
+            typer.echo()
+
+        # Check if sections.yaml has been manually modified since last process/control
+        if resolved_speaker.sections_hash:
+            current_sections_hash = SpeakerManager.compute_file_hash(
+                resolved_speaker.sections_file
+            )
+            if current_sections_hash != resolved_speaker.sections_hash:
+                typer.echo(
+                    "Warning: sections.yaml has been modified since last processing.",
+                    err=True,
+                )
+                typer.echo(
+                    "This may be intentional (manual edits) or accidental.",
+                    err=True,
+                )
+                typer.echo()
+
+                choice = typer.prompt(
+                    "Continue? (Save as current, Yes, No)", default="N"
+                ).lower()
+
+                if choice == "n":
+                    raise typer.Abort()
+                elif choice == "s":
+                    # Update sections hash in speaker metadata
+                    resolved_speaker.sections_hash = current_sections_hash
+                    speaker_manager._write_speaker_yaml(
+                        resolved_speaker.speaker_file, resolved_speaker
+                    )
+                    typer.echo("Hash updated.\n")
+                elif choice == "y":
+                    typer.echo()  # Just continue
+                else:
+                    typer.echo("Invalid choice. Aborting.", err=True)
+                    raise typer.Abort()
+
         # Load sections data from YAML
         from moves_cli.core.components.section_producer import SectionProducer
 

@@ -35,6 +35,11 @@ class Speaker:
     source_presentation: Path
     source_transcript: Path
     last_processed: str | None = None
+    presentation_hash: str | None = None  # xxh3_64 hash of source at last process
+    transcript_hash: str | None = None  # xxh3_64 hash of source at last process
+    sections_hash: str | None = (
+        None  # xxh3_64 hash of sections.yaml at last process/control
+    )
 
     # useful properties
     @property

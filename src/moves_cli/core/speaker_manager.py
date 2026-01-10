@@ -34,22 +34,21 @@ class MsecondsElapsedColumn(ProgressColumn):
         return Text(f"{elapsed:.1f}s")
 
 
-# i will completely remove the backup things, look todo
 class SpeakerManager:
     def __init__(self, data_handler: DataHandler):
         self.data_handler = data_handler
         self.SPEAKERS_PATH = self.data_handler.DATA_FOLDER.resolve() / "speakers"
 
     @staticmethod
-    def _resolve_file(
-        source: Path, backup: Path, file_type: str, speaker_label: str
-    ) -> tuple[str, Path]:
-        """Resolve file from source or backup, returns (origin, path)."""
-        if source.exists():
-            return ("SOURCE", source)
-        if backup.exists():
-            return ("BACKUP", backup)
-        raise FileNotFoundError(f"Missing {file_type} file for speaker {speaker_label}")
+    def compute_file_hash(file_path: Path) -> str:
+        """Compute xxh3_64 hash of a file. Returns hex string."""
+        import xxhash
+
+        hasher = xxhash.xxh3_64()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
 
     def _write_speaker_yaml(self, path: Path, speaker: Speaker) -> None:
         from io import StringIO
@@ -179,25 +178,30 @@ class SpeakerManager:
         typer.echo(f"Processing {len(speakers)} speaker(s).")
         typer.echo()
 
-        for speaker, speaker_path in zip(speakers, speaker_paths):
+        for speaker in speakers:
             source_presentation = speaker.source_presentation
             source_transcript = speaker.source_transcript
-            backup_presentation = speaker_path / "presentation.pdf"
-            backup_transcript = speaker_path / "transcript.pdf"
 
-            presentation_from, pres_path_display = self._resolve_file(
-                source_presentation, backup_presentation, "presentation", speaker.label
-            )
-            transcript_from, trans_path_display = self._resolve_file(
-                source_transcript, backup_transcript, "transcript", speaker.label
-            )
+            # Validate source files exist (no backup fallback)
+            missing_files = []
+            if not source_presentation.exists():
+                missing_files.append(f"Presentation: {source_presentation}")
+            if not source_transcript.exists():
+                missing_files.append(f"Transcript: {source_transcript}")
+
+            if missing_files:
+                raise FileNotFoundError(
+                    f"Missing source files for speaker {speaker.label}:\n"
+                    + "\n".join(f"  - {f}" for f in missing_files)
+                    + "\n\nPlease update file paths with 'moves speaker edit' command."
+                )
 
             typer.echo(
                 output(
                     speaker.label,
                     {
-                        f"Presentation ({presentation_from})": pres_path_display,
-                        f"Transcript ({transcript_from})": trans_path_display,
+                        "Presentation": source_presentation,
+                        "Transcript": source_transcript,
                     },
                 )
             )
@@ -248,110 +252,95 @@ class SpeakerManager:
                 start_time = time.perf_counter()
                 progress_callback("Starting...")
 
-                # these also will be removed, backups etc.
+                # Compute hashes before copying (for change detection)
+                progress_callback("Computing file hashes...")
+                presentation_hash = await asyncio.to_thread(
+                    self.compute_file_hash, source_presentation
+                )
+                transcript_hash = await asyncio.to_thread(
+                    self.compute_file_hash, source_transcript
+                )
 
-                backup_presentation = speaker_path / "presentation.pdf"
-                backup_transcript = speaker_path / "transcript.pdf"
+                # Copy to temp directory for atomic/safe processing
+                import shutil
+                import tempfile
 
-                presentation_path, transcript_path = None, None
+                temp_dir = Path(tempfile.mkdtemp(prefix="moves_"))
+                try:
+                    progress_callback("Copying files to temp...")
+                    presentation_path = temp_dir / "presentation.pdf"
+                    transcript_path = temp_dir / "transcript.pdf"
 
-                if source_presentation.exists():
-                    progress_callback("Copying presentation...")
                     await asyncio.to_thread(
-                        self.data_handler.copy, source_presentation, speaker_path
+                        shutil.copy2, source_presentation, presentation_path
                     )
-                    if source_presentation.name != "presentation.pdf":
-                        relative_file_path = (
-                            speaker_path / source_presentation.name
-                        ).relative_to(self.data_handler.DATA_FOLDER)
-                        await asyncio.to_thread(
-                            self.data_handler.rename,
-                            relative_file_path,
-                            "presentation.pdf",
-                        )
-                    presentation_path = speaker_path / "presentation.pdf"
-                elif backup_presentation.exists():
-                    presentation_path = backup_presentation
-                else:
-                    raise FileNotFoundError(
-                        f"Missing presentation file for speaker {speaker.label}"
-                    )
-
-                if source_transcript.exists():
-                    progress_callback("Copying transcript...")
                     await asyncio.to_thread(
-                        self.data_handler.copy, source_transcript, speaker_path
-                    )
-                    if source_transcript.name != "transcript.pdf":
-                        relative_file_path = (
-                            speaker_path / source_transcript.name
-                        ).relative_to(self.data_handler.DATA_FOLDER)
-                        await asyncio.to_thread(
-                            self.data_handler.rename,
-                            relative_file_path,
-                            "transcript.pdf",
-                        )
-                    transcript_path = speaker_path / "transcript.pdf"
-                elif backup_transcript.exists():
-                    transcript_path = backup_transcript
-                else:
-                    raise FileNotFoundError(
-                        f"Missing transcript file for speaker {speaker.label}"
+                        shutil.copy2, source_transcript, transcript_path
                     )
 
-                from moves_cli.core.components.section_producer import (
-                    SectionProducer,
-                )
+                    from moves_cli.core.components.section_producer import (
+                        SectionProducer,
+                    )
 
-                section_producer = SectionProducer()
+                    section_producer = SectionProducer()
 
-                # Run generation in a daemon thread so it doesn't block sys.exit()
-                loop = asyncio.get_running_loop()
-                future = loop.create_future()
+                    # Run generation in a daemon thread so it doesn't block sys.exit()
+                    loop = asyncio.get_running_loop()
+                    future = loop.create_future()
 
-                def run_generation() -> None:
-                    try:
-                        result = section_producer.generate_sections(
-                            presentation_path=presentation_path,
-                            transcript_path=transcript_path,
-                            llm_model=llm_model,
-                            llm_api_key=llm_api_key,
-                            callback=progress_callback,
-                        )
-                        loop.call_soon_threadsafe(future.set_result, result)
-                    except Exception as e:
-                        loop.call_soon_threadsafe(future.set_exception, e)
+                    def run_generation() -> None:
+                        try:
+                            result = section_producer.generate_sections(
+                                presentation_path=presentation_path,
+                                transcript_path=transcript_path,
+                                llm_model=llm_model,
+                                llm_api_key=llm_api_key,
+                                callback=progress_callback,
+                            )
+                            loop.call_soon_threadsafe(future.set_result, result)
+                        except Exception as e:
+                            loop.call_soon_threadsafe(future.set_exception, e)
 
-                # Daemon thread dies when main process exits
-                thread = threading.Thread(target=run_generation, daemon=True)
-                thread.start()
+                    # Daemon thread dies when main process exits
+                    thread = threading.Thread(target=run_generation, daemon=True)
+                    thread.start()
 
-                sections = await future
+                    sections = await future
 
-                progress_callback("Writing to file...")
-                self.data_handler.write(
-                    speaker_path / SECTIONS_FILENAME,
-                    section_producer.convert_to_yaml(sections),
-                )
+                    progress_callback("Writing to file...")
+                    self.data_handler.write(
+                        speaker_path / SECTIONS_FILENAME,
+                        section_producer.convert_to_yaml(sections),
+                    )
 
-                processing_time = time.perf_counter() - start_time
+                    processing_time = time.perf_counter() - start_time
 
-                # Update progress to show Done and freeze timer
-                progress.update(
-                    task_id,
-                    description=f"Processing {speaker.label}... Done",
-                )
-                progress.stop_task(task_id)
+                    # Update progress to show Done and freeze timer
+                    progress.update(
+                        task_id,
+                        description=f"Processing {speaker.label}... Done",
+                    )
+                    progress.stop_task(task_id)
 
-                # Update speaker last_processed timestamp
-                speaker.last_processed = datetime.now().isoformat()
-                self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
+                    # Update speaker metadata with timestamp and hashes
+                    speaker.last_processed = datetime.now().isoformat()
+                    speaker.presentation_hash = presentation_hash
+                    speaker.transcript_hash = transcript_hash
+                    # Compute sections hash after writing
+                    sections_hash = self.compute_file_hash(
+                        speaker_path / SECTIONS_FILENAME
+                    )
+                    speaker.sections_hash = sections_hash
+                    self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
 
-                return ProcessResult(
-                    section_count=len(sections),
-                    speaker_id=speaker.speaker_id,
-                    processing_time_seconds=processing_time,
-                )
+                    return ProcessResult(
+                        section_count=len(sections),
+                        speaker_id=speaker.speaker_id,
+                        processing_time_seconds=processing_time,
+                    )
+                finally:
+                    # Clean up temp directory
+                    await asyncio.to_thread(shutil.rmtree, temp_dir, ignore_errors=True)
 
             tasks = []
             try:
