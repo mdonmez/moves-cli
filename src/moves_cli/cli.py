@@ -460,16 +460,16 @@ def speaker_delete(
         failed_count = 0
 
         for speaker in resolved_speakers:
-            success = speaker_manager.delete(speaker)
-            if success:
+            try:
+                speaker_manager.delete(speaker)
                 if yes:
                     typer.echo(output(f"Speaker {speaker.label} deleted."))
                 deleted_count += 1
-            else:
+            except Exception as e:
                 typer.echo(
                     output(
                         f"Could not delete speaker '{speaker.name}'.",
-                        {"Reason": "Failed to delete speaker data"},
+                        {"Reason": str(e)},
                     ),
                     err=True,
                 )

@@ -8,7 +8,6 @@ class DataHandler:
     def __init__(self, data_folder: Path = DEFAULT_DATA_FOLDER):
         self.DATA_FOLDER = data_folder
 
-
     def _resolve_path(self, path: Path) -> Path:
         path = Path(path)
         if path.is_absolute():
@@ -21,12 +20,11 @@ class DataHandler:
         except ValueError:
             return self.DATA_FOLDER / path
 
-    def write(self, path: Path, data: str) -> bool:
+    def write(self, path: Path, data: str) -> None:
         full_path = self._resolve_path(path)
         try:
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(data, encoding="utf-8")
-            return True
         except Exception as e:
             raise RuntimeError(f"Write operation failed for {path}: {e}") from e
 
@@ -70,7 +68,7 @@ class DataHandler:
                 f"Rename operation failed for {full_path} to {new_name}: {e}"
             ) from e
 
-    def delete(self, path: Path) -> bool:
+    def delete(self, path: Path) -> None:
         full_path = self._resolve_path(path)
         if not full_path.exists():
             raise FileNotFoundError(f"Path not found: {path}")
@@ -82,11 +80,10 @@ class DataHandler:
                 shutil.rmtree(full_path)
             else:
                 full_path.unlink()
-            return True
         except Exception as e:
             raise RuntimeError(f"Delete operation failed for {path}: {e}") from e
 
-    def copy(self, source: Path, target: Path) -> bool:
+    def copy(self, source: Path, target: Path) -> None:
         source_path = self._resolve_path(source)
         target_path = self._resolve_path(target)
 
@@ -105,7 +102,6 @@ class DataHandler:
             if source_path.is_file():
                 dest_file = target_path / source_path.name
                 shutil.copy2(source_path, dest_file)
-                return True
             elif source_path.is_dir():
                 for item in source_path.rglob("*"):
                     relative_path = item.relative_to(source_path)
@@ -115,7 +111,6 @@ class DataHandler:
                     else:
                         dest_item.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(item, dest_item)
-                return True
             else:
                 raise RuntimeError(
                     f"Source path is neither file nor directory: {source}"

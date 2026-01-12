@@ -413,11 +413,9 @@ class SpeakerManager:
                 # Restore original signal handler
                 signal.signal(signal.SIGINT, original_sigint)
 
-    def delete(self, speaker: Speaker) -> bool:
-        # the most minimal thing
+    def delete(self, speaker: Speaker) -> None:
         speaker_path = self.SPEAKERS_PATH / speaker.speaker_id
-        result = bool(self.data_handler.delete(speaker_path))
-        return result
+        self.data_handler.delete(speaker_path)
 
     def list(self) -> list[Speaker]:
         speakers = []
