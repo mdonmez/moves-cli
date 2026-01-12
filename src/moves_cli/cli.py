@@ -42,9 +42,9 @@ def version_callback(value: bool):
             import importlib.metadata
 
             version = importlib.metadata.version("moves-cli")
-            typer.echo(f"moves-cli version {version}")
+            typer.echo(output(f"moves-cli version {version}"))
         except Exception:
-            typer.echo("Error retrieving version")
+            typer.echo(output("Error retrieving version"))
         raise typer.Exit()
 
 
@@ -69,13 +69,12 @@ def speaker_add(
     """Create a new speaker profile with presentation and transcript files"""
     # Validate file paths exist
     if not source_presentation.exists() or not source_transcript.exists():
-        typer.echo(f"Could not add speaker '{name}'.", err=True)
+        missing = {}
         if not source_presentation.exists():
-            typer.echo(
-                f"    Presentation file not found: {source_presentation}", err=True
-            )
+            missing["Presentation"] = f"Not found: {source_presentation}"
         if not source_transcript.exists():
-            typer.echo(f"    Transcript file not found: {source_transcript}", err=True)
+            missing["Transcript"] = f"Not found: {source_transcript}"
+        typer.echo(output(f"Could not add speaker '{name}'.", missing), err=True)
         raise typer.Exit(1)
 
     try:
@@ -84,13 +83,14 @@ def speaker_add(
         speaker = speaker_manager.add(name, source_presentation, source_transcript)
 
         # Display success message
-        typer.echo(f"Speaker {speaker.label} has been successfully added.")
+        typer.echo(output(f"Speaker {speaker.label} has been successfully added."))
 
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(f"Could not add speaker '{name}'.", err=True)
-        typer.echo(f"    {str(e)}", err=True)
+        typer.echo(
+            output(f"Could not add speaker '{name}'.", {"Error": str(e)}), err=True
+        )
         raise typer.Exit(1)
 
 
@@ -108,7 +108,9 @@ def speaker_edit(
     # Validate at least one parameter is provided
     if not source_presentation and not source_transcript:
         typer.echo(
-            "Error: At least one update parameter (--presentation or --transcript) must be provided",
+            output(
+                "Error: At least one update parameter (--presentation or --transcript) must be provided"
+            ),
             err=True,
         )
         raise typer.Exit(1)
@@ -124,20 +126,22 @@ def speaker_edit(
 
         if presentation_path and not presentation_path.exists():
             typer.echo(
-                f"Could not update speaker {resolved_speaker.label}.",
+                output(
+                    f"Could not update speaker {resolved_speaker.label}.",
+                    {"Presentation": f"Not found: {presentation_path}"},
+                ),
                 err=True,
-            )
-            typer.echo(
-                f"    Presentation file not found: {presentation_path}", err=True
             )
             raise typer.Exit(1)
 
         if transcript_path and not transcript_path.exists():
             typer.echo(
-                f"Could not update speaker {resolved_speaker.label}.",
+                output(
+                    f"Could not update speaker {resolved_speaker.label}.",
+                    {"Transcript": f"Not found: {transcript_path}"},
+                ),
                 err=True,
             )
-            typer.echo(f"    Transcript file not found: {transcript_path}", err=True)
             raise typer.Exit(1)
 
         # Update speaker
@@ -161,7 +165,7 @@ def speaker_edit(
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(f"Error: {str(e)}", err=True)
+        typer.echo(output(f"Error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -174,7 +178,7 @@ def speaker_list():
         speakers = speaker_manager.list()
 
         if not speakers:
-            typer.echo("No speakers are registered.")
+            typer.echo(output("No speakers are registered."))
             return
 
         # Build table rows
@@ -204,7 +208,7 @@ def speaker_list():
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(f"Error accessing speaker data: {str(e)}", err=True)
+        typer.echo(output(f"Error accessing speaker data: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -246,7 +250,7 @@ def speaker_show(
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(f"Error: {str(e)}", err=True)
+        typer.echo(output(f"Error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -277,22 +281,30 @@ def speaker_process(
             # Validate LLM settings (auto mode only)
             if not settings.model:
                 typer.echo(
-                    "Error: LLM model not configured. Use 'moves settings set model <model>' to configure.",
+                    output(
+                        "Error: LLM model not configured. Use 'moves settings set model <model>' to configure."
+                    ),
                     err=True,
                 )
                 typer.echo(
-                    "Tip: Use --manual flag to generate a template without LLM.",
+                    output(
+                        "Tip: Use --manual flag to generate a template without LLM."
+                    ),
                     err=True,
                 )
                 raise typer.Exit(1)
 
             if not settings.key:
                 typer.echo(
-                    "Error: LLM API key not configured. Use 'moves settings set key <key>' to configure.",
+                    output(
+                        "Error: LLM API key not configured. Use 'moves settings set key <key>' to configure."
+                    ),
                     err=True,
                 )
                 typer.echo(
-                    "Tip: Use --manual flag to generate a template without LLM.",
+                    output(
+                        "Tip: Use --manual flag to generate a template without LLM."
+                    ),
                     err=True,
                 )
                 raise typer.Exit(1)
@@ -305,7 +317,7 @@ def speaker_process(
             # Get all speakers
             resolved_speakers = speaker_manager.list()
             if not resolved_speakers:
-                typer.echo("No speakers found to process.")
+                typer.echo(output("No speakers found to process."))
                 return
         elif speakers:
             # Resolve each speaker from the list
@@ -316,7 +328,9 @@ def speaker_process(
                 resolved_speakers.append(resolved)
         else:
             typer.echo(
-                "Error: Either provide speaker names or use --all to process all speakers.",
+                output(
+                    "Error: Either provide speaker names or use --all to process all speakers."
+                ),
                 err=True,
             )
             raise typer.Exit(1)
@@ -336,35 +350,38 @@ def speaker_process(
         if len(resolved_speakers) == 1:
             result = results[0]
             speaker = resolved_speakers[0]
-            typer.echo(f"Speaker {speaker.label} processed.")
+            typer.echo(output(f"Speaker {speaker.label} processed."))
             typer.echo()
             if manual:
                 typer.echo(
-                    f"{result.section_count} empty sections created. Edit sections.yaml to add speech content."
+                    output(
+                        f"{result.section_count} empty sections created. Edit sections.yaml to add speech content."
+                    )
                 )
                 typer.echo()
-                typer.echo(f"File: {speaker.sections_file}")
+                typer.echo(output(f"File: {speaker.sections_file}"))
             else:
                 typer.echo(
-                    f"{result.section_count} sections have been created in {result.processing_time_seconds:.1f} seconds."
+                    output(
+                        f"{result.section_count} sections have been created in {result.processing_time_seconds:.1f} seconds."
+                    )
                 )
         else:
-            typer.echo(f"{len(resolved_speakers)} speakers processed.")
+            typer.echo(output(f"{len(resolved_speakers)} speakers processed."))
             typer.echo()
 
             if manual:
                 # Manual mode: show section counts and file paths
+                manual_results = {}
                 for i, result in enumerate(results):
                     speaker = resolved_speakers[i]
-                    typer.echo(
-                        f"  {speaker.label}: {result.section_count} empty sections"
+                    manual_results[speaker.label] = (
+                        f"{result.section_count} empty sections → {speaker.sections_file}"
                     )
-                    typer.echo(f"    File: {speaker.sections_file}")
-                    if i < len(results) - 1:
-                        typer.echo()
 
+                typer.echo(output(None, manual_results))
                 typer.echo()
-                typer.echo("Edit sections.yaml files to add speech content.")
+                typer.echo(output("Edit sections.yaml files to add speech content."))
             else:
                 # Auto mode: show section counts with timing
                 total_time = sum(result.processing_time_seconds for result in results)
@@ -377,15 +394,15 @@ def speaker_process(
 
                 typer.echo(output(None, results_dict))
                 typer.echo()
-                typer.echo(f"Total processing time: {total_time:.1f} seconds.")
+                typer.echo(output(f"Total processing time: {total_time:.1f} seconds."))
 
     except typer.Exit:
         raise
     except typer.Abort:
-        typer.echo("Aborted.")
+        typer.echo(output("Aborted."))
         raise typer.Exit(0)
     except Exception as e:
-        typer.echo(f"Processing error: {str(e)}", err=True)
+        typer.echo(output(f"Processing error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -405,7 +422,7 @@ def speaker_delete(
             # Get all speakers
             resolved_speakers = speaker_manager.list()
             if not resolved_speakers:
-                typer.echo("No speakers found to delete.")
+                typer.echo(output("No speakers found to delete."))
                 return
         elif speakers:
             # Resolve each speaker from the list
@@ -416,22 +433,26 @@ def speaker_delete(
                 resolved_speakers.append(resolved)
         else:
             typer.echo(
-                "Error: Either provide speaker names or use --all to delete all speakers.",
+                output(
+                    "Error: Either provide speaker names or use --all to delete all speakers."
+                ),
                 err=True,
             )
             raise typer.Exit(1)
 
         # Display deletion plan
+        speakers_to_delete = {s.speaker_id: s.name for s in resolved_speakers}
         typer.echo(
-            f"Are you sure you want to delete the following {len(resolved_speakers)} speaker(s)?"
+            output(
+                f"Are you sure you want to delete the following {len(resolved_speakers)} speaker(s)?",
+                speakers_to_delete,
+            )
         )
-        for speaker in resolved_speakers:
-            typer.echo(f"  {speaker.speaker_id}")
         typer.echo()
 
         if not yes:
             typer.confirm("Proceed?", default=True, abort=True)
-            typer.echo("Yes")
+            typer.echo(output("Yes"))
             typer.echo()
 
         # Delete speakers using for loop and display results immediately
@@ -442,15 +463,20 @@ def speaker_delete(
             success = speaker_manager.delete(speaker)
             if success:
                 if yes:
-                    typer.echo(f"Speaker {speaker.label} deleted.")
+                    typer.echo(output(f"Speaker {speaker.label} deleted."))
                 deleted_count += 1
             else:
-                typer.echo(f"Could not delete speaker '{speaker.name}'.", err=True)
-                typer.echo("    Failed to delete speaker data.", err=True)
+                typer.echo(
+                    output(
+                        f"Could not delete speaker '{speaker.name}'.",
+                        {"Reason": "Failed to delete speaker data"},
+                    ),
+                    err=True,
+                )
                 failed_count += 1
 
         if not yes and deleted_count > 0:
-            typer.echo("Speaker(s) deleted.")
+            typer.echo(output("Speaker(s) deleted."))
 
         # Exit with error if any deletions failed
         if failed_count > 0:
@@ -459,10 +485,10 @@ def speaker_delete(
     except typer.Exit:
         raise
     except typer.Abort:
-        typer.echo("Aborted.")
+        typer.echo(output("Aborted."))
         raise typer.Exit(0)
     except Exception as e:
-        typer.echo(f"Error: {str(e)}", err=True)
+        typer.echo(output(f"Error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -484,11 +510,15 @@ def presentation_control(
         # Check for processed sections data
         if not resolved_speaker.sections_file.exists():
             typer.echo(
-                f"Error: Speaker {resolved_speaker.label} has not been processed yet.",
+                output(
+                    f"Error: Speaker {resolved_speaker.label} has not been processed yet."
+                ),
                 err=True,
             )
             typer.echo(
-                f"Please run 'moves speaker process {resolved_speaker.speaker_id}' first to generate sections.",
+                output(
+                    f"Please run 'moves speaker process {resolved_speaker.speaker_id}' first to generate sections."
+                ),
                 err=True,
             )
             raise typer.Exit(1)
@@ -503,14 +533,16 @@ def presentation_control(
             missing_files.append(f"Transcript: {resolved_speaker.source_transcript}")
 
         if missing_files:
-            typer.echo(
-                f"Error: Missing source files for speaker {resolved_speaker.label}:",
-                err=True,
-            )
+            missing_dict = {}
             for f in missing_files:
-                typer.echo(f"  - {f}", err=True)
+                key, val = f.split(": ", 1)
+                missing_dict[key] = val
             typer.echo(
-                "\nPlease update file paths with 'moves speaker edit' command.",
+                output(
+                    f"Error: Missing source files for speaker {resolved_speaker.label}.",
+                    missing_dict,
+                    "Please update file paths with 'moves speaker edit' command.",
+                ),
                 err=True,
             )
             raise typer.Exit(1)
@@ -535,20 +567,16 @@ def presentation_control(
 
         if files_changed:
             typer.echo(
-                "Warning: The following source files have changed since last processing:",
+                output(
+                    "Warning: The following source files have changed since last processing.",
+                    {f: "Changed" for f in files_changed},
+                    "You may be using outdated section data.",
+                    {
+                        "Re-process": f"moves speaker process {resolved_speaker.speaker_id}"
+                    },
+                ),
                 err=True,
             )
-            for f in files_changed:
-                typer.echo(f"  - {f}", err=True)
-            typer.echo(
-                "\nYou may be using outdated section data. Consider re-processing with:",
-                err=True,
-            )
-            typer.echo(
-                f"  moves speaker process {resolved_speaker.speaker_id}",
-                err=True,
-            )
-            typer.echo()
             if not typer.confirm("Continue anyway?", default=False):
                 raise typer.Abort()
             typer.echo()
@@ -560,11 +588,10 @@ def presentation_control(
             )
             if current_sections_hash != resolved_speaker.sections_hash:
                 typer.echo(
-                    "Warning: sections.yaml has been modified since last processing.",
-                    err=True,
-                )
-                typer.echo(
-                    "This may be intentional (manual edits) or accidental.",
+                    output(
+                        "Warning: sections.yaml has been modified since last processing.",
+                        "This may be intentional (manual edits) or accidental.",
+                    ),
                     err=True,
                 )
                 typer.echo()
@@ -581,11 +608,11 @@ def presentation_control(
                     speaker_manager._write_speaker_yaml(
                         resolved_speaker.speaker_file, resolved_speaker
                     )
-                    typer.echo("Hash updated.\n")
+                    typer.echo(output("Hash updated.\n"))
                 elif choice == "y":
                     typer.echo()  # Just continue
                 else:
-                    typer.echo("Invalid choice. Aborting.", err=True)
+                    typer.echo(output("Invalid choice. Aborting."), err=True)
                     raise typer.Abort()
 
         # Load sections data from YAML
@@ -597,18 +624,20 @@ def presentation_control(
         )
 
         if not sections:
-            typer.echo("Error: No sections found in processed data.", err=True)
+            typer.echo(output("Error: No sections found in processed data."), err=True)
             raise typer.Exit(1)
 
         # Check for empty sections (unfilled template from manual mode)
         empty_sections = [s for s in sections if not s.content.strip()]
         if empty_sections:
             typer.echo(
-                f"Warning: {len(empty_sections)} of {len(sections)} sections have empty content.",
+                output(
+                    f"Warning: {len(empty_sections)} of {len(sections)} sections have empty content."
+                ),
                 err=True,
             )
             typer.echo(
-                "These slides will not respond to voice navigation.",
+                output("These slides will not respond to voice navigation."),
                 err=True,
             )
             typer.echo()
@@ -629,17 +658,21 @@ def presentation_control(
                 sections, window_size=window_size
             )
 
-        typer.echo(f"Live control session started for {resolved_speaker.label}.")
-        typer.echo("  [←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit\n")
+        typer.echo(
+            output(
+                f"Live control session started for {resolved_speaker.label}.",
+                "[←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit",
+            )
+        )
 
         controller.control()
 
-        typer.echo("\nControl session ended.\n")
+        typer.echo(output("\nControl session ended.\n"))
 
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(f"Presentation control error: {str(e)}", err=True)
+        typer.echo(output(f"Presentation control error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -676,7 +709,7 @@ def settings_list(
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(f"Error accessing settings: {str(e)}", err=True)
+        typer.echo(output(f"Error accessing settings: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -694,8 +727,8 @@ def settings_set(
         valid_keys = ["model", "key"]
 
         if key not in valid_keys:
-            typer.echo(f"Error: Invalid setting key '{key}'", err=True)
-            typer.echo(f"Valid keys: {', '.join(valid_keys)}", err=True)
+            typer.echo(output(f"Error: Invalid setting key '{key}'"), err=True)
+            typer.echo(output(f"Valid keys: {', '.join(valid_keys)}"), err=True)
             raise typer.Exit(1)
 
         # Update setting
@@ -704,13 +737,13 @@ def settings_set(
         if success:
             typer.echo(output(f"Setting '{key}' updated.", {"New Value": value}))
         else:
-            typer.echo(f"Could not update setting '{key}'.", err=True)
+            typer.echo(output(f"Could not update setting '{key}'."), err=True)
             raise typer.Exit(1)
 
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(f"Unexpected error: {str(e)}", err=True)
+        typer.echo(output(f"Unexpected error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -728,8 +761,8 @@ def settings_unset(
         # Check if key exists in template
         valid_keys = ["model", "key"]
         if key not in valid_keys:
-            typer.echo(f"Error: Invalid setting key '{key}'", err=True)
-            typer.echo(f"Valid keys: {', '.join(valid_keys)}", err=True)
+            typer.echo(output(f"Error: Invalid setting key '{key}'"), err=True)
+            typer.echo(output(f"Valid keys: {', '.join(valid_keys)}"), err=True)
             raise typer.Exit(1)
 
         # Get the template value to show what it will be reset to
@@ -752,13 +785,13 @@ def settings_unset(
                 )
             )
         else:
-            typer.echo(f"Could not reset setting '{key}'.", err=True)
+            typer.echo(output(f"Could not reset setting '{key}'."), err=True)
             raise typer.Exit(1)
 
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(f"Unexpected error: {str(e)}", err=True)
+        typer.echo(output(f"Unexpected error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 

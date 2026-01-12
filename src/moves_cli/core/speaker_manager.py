@@ -175,7 +175,7 @@ class SpeakerManager:
             self.SPEAKERS_PATH / speaker.speaker_id for speaker in speakers
         ]
 
-        typer.echo(f"Processing {len(speakers)} speaker(s).")
+        typer.echo(output(f"Processing {len(speakers)} speaker(s)."))
         typer.echo()
 
         # Collect estimation results with spinner (only in auto mode)
@@ -311,7 +311,7 @@ class SpeakerManager:
 
             def sigint_handler(signum: int, frame: FrameType | None) -> None:
                 progress.stop()
-                typer.echo("\nCancelled.")
+                typer.echo(output("\nCancelled."))
                 sys.exit(130)  # 128 + SIGINT(2)
 
             signal.signal(signal.SIGINT, sigint_handler)

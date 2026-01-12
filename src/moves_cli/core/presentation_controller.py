@@ -15,6 +15,7 @@ from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.models import Section, SttModel, VadModel
 from moves_cli.utils import model_preparer, text_normalizer
+from moves_cli.utils.output_formatter import output
 
 
 class PresentationController:
@@ -164,7 +165,7 @@ class PresentationController:
             except Empty:
                 continue
             except Exception as e:
-                typer.echo(f"Error in STT Processor thread: {e}", err=True)
+                typer.echo(output(f"Error in STT Processor thread: {e}"), err=True)
                 self.shutdown_flag.set()
 
     def _navigator_task(self) -> None:
@@ -224,9 +225,11 @@ class PresentationController:
                 # Clear inline VAD status line before printing full output
                 print("\r" + " " * 20 + "\r", end="", flush=True)
                 typer.echo(
-                    f"{slide_position} | {similarity_pct} | {status} | {vad_indicator}\n"
-                    f"    Speech → ...{speech_preview}\n"
-                    f"    Match  → ...{match_preview}\n"
+                    output(
+                        f"{slide_position} | {similarity_pct} | {status} | {vad_indicator}\n"
+                        f"    Speech → ...{speech_preview}\n"
+                        f"    Match  → ...{match_preview}\n"
+                    )
                 )
 
                 # if the similarity is above the threshold, then act
@@ -238,7 +241,7 @@ class PresentationController:
             except Empty:
                 continue
             except Exception as e:
-                typer.echo(f"Error in Navigator thread: {e}", err=True)
+                typer.echo(output(f"Error in Navigator thread: {e}"), err=True)
                 self.shutdown_flag.set()
 
     def _perform_navigation(self, target_section: Section) -> None:
@@ -277,9 +280,11 @@ class PresentationController:
                     self.shutdown_flag.wait(timeout=self.SHUTDOWN_CHECK_INTERVAL)
 
         except KeyboardInterrupt:
-            typer.echo("\nShutting down...")
+            typer.echo(output("\nShutting down..."))
         except Exception as e:
-            typer.echo(f"\nAn error occurred in the audio stream: {e}", err=True)
+            typer.echo(
+                output(f"\nAn error occurred in the audio stream: {e}"), err=True
+            )
 
         finally:
             self.shutdown_flag.set()
@@ -290,4 +295,4 @@ class PresentationController:
                 if thread.is_alive():
                     thread.join(timeout=self.THREAD_JOIN_TIMEOUT)
 
-            typer.echo("Shut down successfully.")
+            typer.echo(output("Shut down successfully."))

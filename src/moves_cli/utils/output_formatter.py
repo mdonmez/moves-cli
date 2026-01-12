@@ -6,59 +6,94 @@ from rich.console import Console
 from rich.table import Table
 
 
-# i literally have no idea how this works but it does, COMPLETELY ai generated
-def output(*args: str | dict[str, Any] | list[dict[str, Any]]) -> str:
-    buf = StringIO()
-    con = Console(file=buf, highlight=False, markup=False, force_terminal=True)
-    out: list[str] = []
-    kvs: list[tuple[str, str]] = []
+type OutputArg = str | dict[str, Any] | list[dict[str, Any]]
 
-    def flush() -> None:
-        if not kvs:
+
+def output(*args: OutputArg) -> str:
+    buffer = StringIO()
+    console = Console(file=buffer, highlight=False, markup=False, force_terminal=True)
+
+    output_parts: list[str] = []
+    pending_key_values: list[tuple[str, str]] = []
+
+    def flush_key_values() -> None:
+        if not pending_key_values:
             return
-        tbl = Table(show_header=False, box=None, pad_edge=False)
-        tbl.add_column(no_wrap=True)
-        tbl.add_column(overflow="fold")
-        [tbl.add_row(k, v) for k, v in kvs]
-        buf.seek(0), buf.truncate(), con.print(tbl)
-        out.append(buf.getvalue().rstrip())
-        kvs.clear()
 
-    def table(rows: list[dict[str, Any]]) -> str:
+        key_value_table = Table(show_header=False, box=None, pad_edge=False)
+        key_value_table.add_column(no_wrap=True)
+        key_value_table.add_column(overflow="fold")
+
+        for key, value in pending_key_values:
+            key_value_table.add_row(key, value)
+
+        buffer.seek(0)
+        buffer.truncate()
+        console.print(key_value_table)
+        output_parts.append(buffer.getvalue().rstrip())
+        pending_key_values.clear()
+
+    def render_table(rows: list[dict[str, Any]]) -> str:
         if not rows:
             return ""
-        hdrs, last = list(rows[0].keys()), len(rows[0]) - 1
-        tbl = Table(
-            show_header=True, header_style=None, box=box.SIMPLE_HEAD, pad_edge=False
+
+        headers = list(rows[0].keys())
+        last_column_index = len(headers) - 1
+
+        data_table = Table(
+            show_header=True,
+            header_style=None,
+            box=box.SIMPLE_HEAD,
+            pad_edge=False,
         )
-        [
-            tbl.add_column(
-                h, no_wrap=i < last, overflow="fold" if i == last else "ellipsis"
+
+        for index, header in enumerate(headers):
+            is_last_column = index == last_column_index
+            data_table.add_column(
+                header,
+                no_wrap=not is_last_column,
+                overflow="fold" if is_last_column else "ellipsis",
             )
-            for i, h in enumerate(hdrs)
-        ]
-        [tbl.add_row(*(str(r.get(h, "")) for h in hdrs)) for r in rows]
-        buf.seek(0), buf.truncate(), con.print(tbl)
-        return "\n".join(
-            ln.lstrip(" ")[:1] and ln[1:] if ln[0:1] == " " else ln
-            for ln in buf.getvalue().strip().split("\n")
-        )
+
+        for row in rows:
+            cell_values = [str(row.get(header, "")) for header in headers]
+            data_table.add_row(*cell_values)
+
+        buffer.seek(0)
+        buffer.truncate()
+        console.print(data_table)
+
+        # rich adds 1 char padding to each line, strip it
+        lines = buffer.getvalue().strip().split("\n")
+        cleaned_lines = []
+        for line in lines:
+            if line.startswith(" ") and len(line) > 1:
+                cleaned_lines.append(line[1:])
+            else:
+                cleaned_lines.append(line)
+
+        return "\n".join(cleaned_lines)
 
     for arg in args:
         match arg:
-            case str():
-                flush()
-                out and out.append("")
-                out.append(arg)
-            case dict() as d:
-                kvs.extend(
-                    (f"  {k}" if k.endswith(":") else f"  {k}:", str(v))
-                    for k, v in d.items()
-                )
-            case [dict(), *_]:
-                flush()
-                out and out.append("")
-                out.append(table(arg))
+            case str() as message:
+                flush_key_values()
+                if output_parts:
+                    output_parts.append("")  # blank line between sections
+                output_parts.append(message)
 
-    flush()
-    return "\n".join(out)
+            case dict() as key_value_pairs:
+                for key, value in key_value_pairs.items():
+                    # avoid double colon if key already ends with :
+                    formatted_key = f"  {key}" if key.endswith(":") else f"  {key}:"
+                    pending_key_values.append((formatted_key, str(value)))
+
+            case [dict(), *_] as table_rows:
+                flush_key_values()
+                if output_parts:
+                    output_parts.append("")
+                output_parts.append(render_table(table_rows))
+
+    flush_key_values()
+
+    return "\n".join(output_parts)
