@@ -1,4 +1,5 @@
 from importlib.resources import files
+from io import StringIO
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -164,7 +165,6 @@ class SectionProducer:
 
     def convert_to_yaml(self, sections: list[Section]) -> str:
         # i have no idea about this writing code, but works perfect
-        from io import StringIO
 
         from ruamel.yaml import YAML
         from ruamel.yaml.comments import CommentedSeq
@@ -197,7 +197,6 @@ class SectionProducer:
 
     def load_from_yaml(self, yaml_content: str) -> list[Section]:
         # this loads the yaml content into a list of Section objects
-        from io import StringIO
 
         from ruamel.yaml import YAML
 

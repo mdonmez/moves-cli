@@ -2,10 +2,14 @@ import asyncio
 import signal
 import sys
 import threading
+import time
 from dataclasses import asdict
 from datetime import datetime
+from io import StringIO
 from pathlib import Path
 from types import FrameType
+
+import xxhash
 
 import typer
 from rich.progress import (
@@ -42,7 +46,6 @@ class SpeakerManager:
     @staticmethod
     def compute_file_hash(file_path: Path) -> str:
         """Compute xxh3_64 hash of a file. Returns hex string."""
-        import xxhash
 
         hasher = xxhash.xxh3_64()
         with open(file_path, "rb") as f:
@@ -51,8 +54,6 @@ class SpeakerManager:
         return hasher.hexdigest()
 
     def _write_speaker_yaml(self, path: Path, speaker: Speaker) -> None:
-        from io import StringIO
-
         from ruamel.yaml import YAML
 
         data = {
@@ -65,8 +66,6 @@ class SpeakerManager:
         self.data_handler.write(path, output.getvalue())
 
     def _read_speaker_yaml(self, path: Path) -> Speaker:
-        from io import StringIO
-
         from ruamel.yaml import YAML
 
         yaml = YAML()
@@ -264,8 +263,6 @@ class SpeakerManager:
         if manual_mode:
             results: list[ProcessResult] = []
             for speaker, speaker_path in zip(speakers, speaker_paths):
-                import time
-
                 start_time = time.perf_counter()
 
                 # Compute presentation hash
@@ -322,8 +319,6 @@ class SpeakerManager:
             async def process_speaker(
                 speaker: Speaker, speaker_path: Path, delay: int, task_id: TaskID
             ) -> ProcessResult:
-                import time
-
                 source_presentation = speaker.source_presentation
                 source_transcript = speaker.source_transcript
 
