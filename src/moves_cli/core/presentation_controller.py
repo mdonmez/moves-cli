@@ -15,7 +15,7 @@ from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.models import Section, SttModel, VadModel
 from moves_cli.utils import model_preparer, text_normalizer
-from moves_cli.utils.output_formatter import output
+from moves_cli.utils.formatters import output
 
 
 class PresentationController:

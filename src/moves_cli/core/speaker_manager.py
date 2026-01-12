@@ -26,7 +26,7 @@ from moves_cli.config import SECTIONS_FILENAME, SPEAKER_FILENAME
 from moves_cli.models import ProcessResult, Speaker
 from moves_cli.utils import id_generator
 from moves_cli.utils.data_handler import DataHandler
-from moves_cli.utils.output_formatter import output
+from moves_cli.utils.formatters import output
 
 
 # for just better ui

@@ -1,5 +1,4 @@
 import asyncio
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -8,7 +7,7 @@ import typer
 from moves_cli.config import DEFAULT_API_KEY, DEFAULT_LLM_MODEL, WINDOW_SIZE
 from moves_cli.models import Section
 from moves_cli.utils.data_handler import DataHandler
-from moves_cli.utils.output_formatter import output
+from moves_cli.utils.formatters import format_datetime, output
 
 
 def speaker_manager_instance():
@@ -185,14 +184,7 @@ def speaker_list():
         rows: list[dict[str, str]] = []
         for speaker in speakers:
             ready_status = "Ready" if speaker.sections_file.exists() else "Not Ready"
-
-            last_processed_str = "N/A"
-            if speaker.last_processed:
-                try:
-                    dt = datetime.fromisoformat(speaker.last_processed)
-                    last_processed_str = dt.strftime("%Y-%m-%d %H:%M")
-                except ValueError:
-                    last_processed_str = "Invalid Date"
+            last_processed_str = format_datetime(speaker.last_processed)
 
             rows.append(
                 {
@@ -223,15 +215,7 @@ def speaker_show(
         resolved_speaker = speaker_manager.resolve(speaker)
 
         status = "Ready" if resolved_speaker.sections_file.exists() else "Not Ready"
-
-        # Display speaker details
-        last_processed_str = "N/A"
-        if resolved_speaker.last_processed:
-            try:
-                dt = datetime.fromisoformat(resolved_speaker.last_processed)
-                last_processed_str = dt.strftime("%Y-%m-%d %H:%M")
-            except ValueError:
-                last_processed_str = "Invalid Date"
+        last_processed_str = format_datetime(resolved_speaker.last_processed)
 
         typer.echo(
             output(

@@ -1,3 +1,4 @@
+from datetime import datetime
 from io import StringIO
 from typing import Any
 
@@ -7,6 +8,17 @@ from rich.table import Table
 
 
 type OutputArg = str | dict[str, Any] | list[dict[str, Any]]
+
+
+def format_datetime(iso_string: str | None, fallback: str = "N/A") -> str:
+    if not iso_string:
+        return fallback
+
+    try:
+        dt = datetime.fromisoformat(iso_string)
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return "Invalid Date"
 
 
 def output(*args: OutputArg) -> str:
