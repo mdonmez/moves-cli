@@ -29,14 +29,12 @@ class SectionProducer:
                     case "presentation":
                         # for page by page, extract text and remove extra spaces, one line full text just. put new lines between pages.
                         markdown_sections = []
-                        slide_count = 0
                         for i, page in enumerate(doc):  # type: ignore
                             page_text = page.get_text("text")
                             cleaned_text = " ".join(page_text.split())
                             markdown_sections.append(
                                 f"# Slide Page {i + 1}\n{cleaned_text}"
                             )
-                            slide_count += 1
 
                         return "\n\n".join(markdown_sections)
         except Exception as e:
