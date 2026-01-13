@@ -53,9 +53,8 @@ app = typer.Typer(
     add_completion=False,
 )
 
-# Subcommands for speaker, presentation, and settings management
+# Subcommands for speaker and settings management
 speaker_app = typer.Typer(help="Manage speaker profiles, files, and processing")
-presentation_app = typer.Typer(help="Live presentation control with voice navigation")
 settings_app = typer.Typer(help="Configure system settings (model, API key)")
 
 
@@ -238,8 +237,8 @@ def speaker_show(
         raise typer.Exit(1)
 
 
-@speaker_app.command("process")
-def speaker_process(
+@speaker_app.command("prepare")
+def speaker_prepare(
     speakers: Optional[list[str]] = typer.Argument(None, help="Speaker(s) to process"),
     all: bool = typer.Option(False, "--all", "-a", help="Process all speakers"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
@@ -250,7 +249,7 @@ def speaker_process(
         help="Generate empty template without LLM (offline mode)",
     ),
 ):
-    """Process the speaker to get ready for the control (use --manual for offline template generation)"""
+    """Prepare the speaker for presentation control (use --manual for offline template generation)"""
     try:
         # Get instances
         speaker_manager = speaker_manager_instance()
@@ -476,11 +475,11 @@ def speaker_delete(
         raise typer.Exit(1)
 
 
-@presentation_app.command("control")
-def presentation_control(
+@app.command("present")
+def present(
     speaker: str = typer.Argument(..., help="Speaker name or ID"),
 ):
-    """Start live voice-controlled presentation navigation (requires processed speaker)"""
+    """Start live voice-controlled presentation navigation (requires prepared speaker)"""
     try:
         from rich.progress import Progress, SpinnerColumn, TextColumn
 
@@ -495,13 +494,13 @@ def presentation_control(
         if not resolved_speaker.sections_file.exists():
             typer.echo(
                 output(
-                    f"Error: Speaker {resolved_speaker.label} has not been processed yet."
+                    f"Error: Speaker {resolved_speaker.label} has not been prepared yet."
                 ),
                 err=True,
             )
             typer.echo(
                 output(
-                    f"Please run 'moves speaker process {resolved_speaker.speaker_id}' first to generate sections."
+                    f"Please run 'moves speaker prepare {resolved_speaker.speaker_id}' first to generate sections."
                 ),
                 err=True,
             )
@@ -556,7 +555,7 @@ def presentation_control(
                     {f: "Changed" for f in files_changed},
                     "You may be using outdated section data.",
                     {
-                        "Re-process": f"moves speaker process {resolved_speaker.speaker_id}"
+                        "Re-process": f"moves speaker prepare {resolved_speaker.speaker_id}"
                     },
                 ),
                 err=True,
@@ -781,7 +780,6 @@ def settings_unset(
 
 # Register subcommands
 app.add_typer(speaker_app, name="speaker")
-app.add_typer(presentation_app, name="presentation")
 app.add_typer(settings_app, name="settings")
 
 
