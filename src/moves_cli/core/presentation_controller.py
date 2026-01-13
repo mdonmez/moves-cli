@@ -60,6 +60,7 @@ class PresentationController:
                 joiner=str(self.MODEL_DIR / "joiner.int8.onnx"),
                 num_threads=self.NUM_THREADS,
                 decoding_method="greedy_search",
+                enable_endpoint_detection=True,
             )
         except Exception as e:
             raise RuntimeError(
@@ -93,6 +94,11 @@ class PresentationController:
 
         # VAD status flag for display (atomic bool via Event for thread-safety)
         self._vad_active = threading.Event()
+
+        # Sliding window buffer - persists across stream resets
+        # Maintains last window_size words for consistent matching
+        self._word_buffer: list[str] = []
+        self._word_buffer_lock = threading.Lock()
 
         with self.section_lock:
             self.current_section = sections[0]
@@ -141,6 +147,8 @@ class PresentationController:
 
     def _stt_processor_task(self) -> None:
         stream = self.recognizer.create_stream()
+        last_word_count = 0  # Track previous word count to detect new words
+
         while not self.shutdown_flag.is_set():
             try:
                 audio_chunk = self.audio_queue.get(timeout=self.QUEUE_TIMEOUT)
@@ -150,17 +158,37 @@ class PresentationController:
                     self.recognizer.decode_stream(stream)
 
                 if text := self.recognizer.get_result(stream):
-                    # we're getting the last window size and process it for real-time app
-                    recent_words = text.strip().split()[-self.window_size :]
-                    normalized = text_normalizer.normalize_text(" ".join(recent_words))
-                    words = normalized.strip().split()
+                    current_words = text.strip().split()
 
-                    if words:
-                        # put the words into a queue for processing
-                        with suppress(Empty):
-                            self.words_queue.get_nowait()
-                        with suppress(Full):
-                            self.words_queue.put_nowait(words)
+                    # Detect new words since last check
+                    if len(current_words) > last_word_count:
+                        new_words = current_words[last_word_count:]
+
+                        # Update sliding window buffer (thread-safe)
+                        with self._word_buffer_lock:
+                            self._word_buffer.extend(new_words)
+                            # Keep only last window_size words
+                            self._word_buffer = self._word_buffer[-self.window_size :]
+
+                            # Prepare words for matching
+                            buffer_text = " ".join(self._word_buffer)
+                            normalized = text_normalizer.normalize_text(buffer_text)
+                            words = normalized.strip().split()
+
+                        # Send to navigator if enough context
+                        if len(words) >= 3:
+                            with suppress(Empty):
+                                self.words_queue.get_nowait()
+                            with suppress(Full):
+                                self.words_queue.put_nowait(words)
+
+                        last_word_count = len(current_words)
+
+                # Reset stream on endpoint (natural speech pauses)
+                # Buffer persists - only STT internal state is cleared
+                if self.recognizer.is_endpoint(stream):
+                    self.recognizer.reset(stream)
+                    last_word_count = 0  # Reset counter for new stream
 
             except Empty:
                 continue
@@ -222,11 +250,15 @@ class PresentationController:
                 # VAD status indicator
                 vad_indicator = "🎙️" if self._vad_active.is_set() else "🔇"
 
+                # Buffer status (word count in sliding window)
+                with self._word_buffer_lock:
+                    buffer_count = len(self._word_buffer)
+
                 # Clear inline VAD status line before printing full output
                 print("\r" + " " * 20 + "\r", end="", flush=True)
                 typer.echo(
                     output(
-                        f"{slide_position} | {similarity_pct} | {status} | {vad_indicator}\n"
+                        f"{slide_position} | {similarity_pct} | {status} | {vad_indicator} | [{buffer_count}w]\n"
                         f"    Speech → ...{speech_preview}\n"
                         f"    Match  → ...{match_preview}\n"
                     )
