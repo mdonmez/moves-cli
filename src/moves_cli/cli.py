@@ -239,8 +239,8 @@ def speaker_show(
 
 @speaker_app.command("prepare")
 def speaker_prepare(
-    speakers: Optional[list[str]] = typer.Argument(None, help="Speaker(s) to process"),
-    all: bool = typer.Option(False, "--all", "-a", help="Process all speakers"),
+    speakers: Optional[list[str]] = typer.Argument(None, help="Speaker(s) to prepare"),
+    all: bool = typer.Option(False, "--all", "-a", help="Prepare all speakers"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
     manual: bool = typer.Option(
         False,
@@ -300,7 +300,7 @@ def speaker_prepare(
             # Get all speakers
             resolved_speakers = speaker_manager.list()
             if not resolved_speakers:
-                typer.echo(output("No speakers found to process."))
+                typer.echo(output("No speakers found to prepare."))
                 return
         elif speakers:
             # Resolve each speaker from the list
@@ -312,7 +312,7 @@ def speaker_prepare(
         else:
             typer.echo(
                 output(
-                    "Error: Either provide speaker names or use --all to process all speakers."
+                    "Error: Either provide speaker names or use --all to prepare all speakers."
                 ),
                 err=True,
             )
@@ -333,7 +333,7 @@ def speaker_prepare(
         if len(resolved_speakers) == 1:
             result = results[0]
             speaker = resolved_speakers[0]
-            typer.echo(output(f"Speaker {speaker.label} processed."))
+            typer.echo(output(f"Speaker {speaker.label} prepared."))
             typer.echo()
             if manual:
                 typer.echo(
@@ -350,7 +350,7 @@ def speaker_prepare(
                     )
                 )
         else:
-            typer.echo(output(f"{len(resolved_speakers)} speakers processed."))
+            typer.echo(output(f"{len(resolved_speakers)} speakers prepared."))
             typer.echo()
 
             if manual:
@@ -377,7 +377,7 @@ def speaker_prepare(
 
                 typer.echo(output(None, results_dict))
                 typer.echo()
-                typer.echo(output(f"Total processing time: {total_time:.1f} seconds."))
+                typer.echo(output(f"Total preparation time: {total_time:.1f} seconds."))
 
     except typer.Exit:
         raise
@@ -385,7 +385,7 @@ def speaker_prepare(
         typer.echo(output("Aborted."))
         raise typer.Exit(0)
     except Exception as e:
-        typer.echo(output(f"Processing error: {str(e)}"), err=True)
+        typer.echo(output(f"Preparation error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
@@ -636,26 +636,26 @@ def present(
             TextColumn("{task.description}"),
             transient=True,
         ) as progress:
-            progress.add_task(description="Starting control session...", total=None)
+            progress.add_task(description="Starting presentation...", total=None)
             controller = presentation_controller_instance(
                 sections, window_size=window_size
             )
 
         typer.echo(
             output(
-                f"Live control session started for {resolved_speaker.label}.",
+                f"Presentation started for {resolved_speaker.label}.",
                 "[←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit",
             )
         )
 
         controller.control()
 
-        typer.echo(output("\nControl session ended.\n"))
+        typer.echo(output("\nPresentation ended.\n"))
 
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(output(f"Presentation control error: {str(e)}"), err=True)
+        typer.echo(output(f"Presentation error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 

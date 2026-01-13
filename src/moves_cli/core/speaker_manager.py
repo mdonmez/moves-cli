@@ -175,7 +175,7 @@ class SpeakerManager:
             self.SPEAKERS_PATH / speaker.speaker_id for speaker in speakers
         ]
 
-        typer.echo(output(f"Processing {len(speakers)} speaker(s)."))
+        typer.echo(output(f"Preparing {len(speakers)} speaker(s)."))
         typer.echo()
 
         # Collect estimation results with spinner (only in auto mode)
@@ -377,7 +377,7 @@ class SpeakerManager:
                 # Update progress to show Done and freeze timer
                 progress.update(
                     task_id,
-                    description=f"Processing {speaker.label}... Done",
+                    description=f"Preparing {speaker.label}... Done",
                 )
                 progress.stop_task(task_id)
 
@@ -401,7 +401,7 @@ class SpeakerManager:
                     zip(speakers, speaker_paths)
                 ):
                     task_id = progress.add_task(
-                        description=f"Processing {speaker.label}...",
+                        description=f"Preparing {speaker.label}...",
                         total=None,
                         start=False,
                     )
