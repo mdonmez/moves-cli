@@ -2,13 +2,22 @@ import asyncio
 import threading
 import time
 from contextlib import suppress
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from queue import Empty, Full, Queue
 
 import sounddevice as sd
-import typer
 from pynput.keyboard import Controller, Key, Listener
+from rich import box
+from rich.align import Align
+from rich.console import Console, Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.rule import Rule
+from rich.table import Table
+from rich.text import Text
+from rich.theme import Theme
 from sherpa_onnx import OnlineRecognizer, VadModelConfig, VoiceActivityDetector
 
 from moves_cli.config import SIMILARITY_THRESHOLD, WINDOW_SIZE
@@ -16,7 +25,6 @@ from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.models import Section, SttModel, VadModel
 from moves_cli.utils import model_preparer, text_normalizer
-from moves_cli.utils.formatters import output
 
 
 class ControllerState(StrEnum):
@@ -25,6 +33,143 @@ class ControllerState(StrEnum):
     ACTIVE = "ACTIVE"  # Normal operation - listening, auto-navigation enabled
     PAUSED = "PAUSED"  # Microphone paused - no processing, keyboard still listened
     LOCKED = "LOCKED"  # Manual override - listening but navigation disabled
+
+
+# =============================================================================
+# Rich UI Theme & Style Mapping
+# =============================================================================
+THEME = Theme(
+    {
+        "accent": "bold cyan",
+        "accent.light": "cyan",
+        "status.active": "bold green",
+        "status.paused": "bold yellow",
+        "status.locked": "bold red",
+        "sim.high": "bold green",
+        "sim.medium": "bold yellow",
+        "sim.low": "bold red",
+        "nav.action": "bold magenta",
+        "muted": "dim",
+        "text": "bright_white",
+    }
+)
+
+STATE_STYLE = {
+    ControllerState.ACTIVE: "status.active",
+    ControllerState.PAUSED: "status.paused",
+    ControllerState.LOCKED: "status.locked",
+}
+
+
+# =============================================================================
+# UI Data Model
+# =============================================================================
+@dataclass(frozen=True, slots=True)
+class UIData:
+    """Dashboard display state for Rich UI."""
+
+    state: ControllerState
+    slide: int
+    total: int
+    similarity: float
+    delta: int
+    speech: list[str]
+    match: list[str]
+    vad: bool
+
+
+# =============================================================================
+# UI Builder Functions
+# =============================================================================
+def _scrolling_text(words: list[str], icon: str, width: int) -> Text:
+    """Create a scrolling text line with left truncation when overflow."""
+    text = " ".join(words)
+    # Account for: icon(1) + space(1) + panel border(2) + padding(2)
+    avail = width - 6
+
+    if len(text) >= avail:
+        # Overflow: truncate from left, show ellipsis
+        truncated = text[-(avail - 1) :]
+        return Text.from_markup(f"{icon} [muted]…[/][text]{truncated}[/]")
+    # Normal: left-aligned
+    return Text.from_markup(f"{icon} [text]{text}[/]")
+
+
+def _build_header(d: UIData) -> Table:
+    """Build the header row: State | Slide | Metrics."""
+    grid = Table.grid(expand=True)
+    grid.add_column(justify="left", ratio=1)
+    grid.add_column(justify="center", ratio=1)
+    grid.add_column(justify="right", ratio=1)
+
+    # State
+    state = Text(d.state, style=STATE_STYLE[d.state])
+
+    # Slide counter
+    slide = Text.from_markup(f"[accent]{d.slide}[/][muted]/{d.total}[/]")
+
+    # Navigation + Similarity
+    sim_style = (
+        "sim.high"
+        if d.similarity >= 0.75
+        else ("sim.medium" if d.similarity >= 0.5 else "sim.low")
+    )
+
+    if d.delta > 0:
+        nav = Text.from_markup(f"[nav.action]{d.delta} ▶[/]  ")
+    elif d.delta < 0:
+        nav = Text.from_markup(f"  [nav.action]◀ {abs(d.delta)}[/]")
+    else:
+        nav = Text.from_markup("  [muted]■[/]  ")
+
+    nav.append(f" {int(d.similarity * 100)}%", style=sim_style)
+
+    grid.add_row(state, slide, nav)
+    return grid
+
+
+def _build_content(d: UIData, width: int) -> Group:
+    """Build the content section: One-line Scrolling Speech + Full Section Text."""
+    vad_icon = "●" if d.vad else "○"
+
+    # --- Speech Block (Single Line Scrolling) ---
+    speech_display = _scrolling_text(d.speech, vad_icon, width)
+
+    # --- Match/Section Block (Full Text) ---
+    section_text = " ".join(d.match)
+    section_display = Text.from_markup(f"≈ [muted]{section_text}[/]")
+
+    return Group(
+        speech_display,
+        Rule(style="muted"),
+        section_display,
+    )
+
+
+def _build_footer() -> Align:
+    """Build the footer with keyboard shortcuts."""
+    return Align.center(
+        Text.from_markup(
+            "[accent][M][/] [muted]Pause[/]  [accent][← →][/] [muted]Nav[/]  [accent][Q][/] [muted]Quit[/]"
+        )
+    )
+
+
+def _build_frame(d: UIData, width: int) -> Panel:
+    """Assemble the complete dashboard frame."""
+    return Panel(
+        Group(
+            _build_header(d),
+            Rule(style="muted"),
+            _build_content(d, width),
+            Rule(style="muted"),
+            _build_footer(),
+        ),
+        title="[accent]moves[/] Presenter",
+        border_style="accent.light",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
 
 
 class PresentationController:
@@ -135,6 +280,20 @@ class PresentationController:
             target=self._navigator_task, daemon=True
         )
 
+        # Rich UI console and live display
+        self._console = Console(theme=THEME)
+        self._live: Live | None = None
+
+        # Cache last displayed content for UI persistence during manual actions
+        self._last_speech: list[str] = []
+        self._last_match: list[str] = []
+        self._last_similarity: float = 0.0
+        self._display_buffer: list[str] = []  # Larger buffer for visual transcript
+
+        # Manual navigation indicator state
+        self._manual_delta: int = 0
+        self._manual_delta_expiry: float = 0.0
+
     # ─────────────────────────────────────────────────────────────────────────
     # State Machine Methods
     # ─────────────────────────────────────────────────────────────────────────
@@ -145,14 +304,10 @@ class PresentationController:
             return self._state
 
     def _set_state(self, new_state: ControllerState) -> None:
-        """Thread-safe state setter with logging."""
+        """Thread-safe state setter."""
         with self._state_lock:
             if self._state != new_state:
-                old_state = self._state
                 self._state = new_state
-                # Clear the VAD line and print state change
-                print("\r" + " " * 20 + "\r", end="", flush=True)
-                typer.echo(output(f"State: {old_state} → {new_state}"))
 
     def _on_key_press(self, key: Key) -> None:
         """Global keyboard listener callback for manual controls.
@@ -167,19 +322,31 @@ class PresentationController:
 
         current_state = self._get_state()
 
+        # Handle Q key - quit
+        if hasattr(key, "char") and key.char == "q":
+            self.shutdown_flag.set()
+            return
+
         # Handle M key - pause/resume toggle
         if hasattr(key, "char") and key.char == "m":
+            new_state: ControllerState | None = None
             match current_state:
                 case ControllerState.ACTIVE:
-                    self._set_state(ControllerState.PAUSED)
+                    new_state = ControllerState.PAUSED
                 case ControllerState.LOCKED:
                     # IMPORTANT: From LOCKED, M goes to PAUSED (not ACTIVE)
                     # Supervisor likely wants full control in front of 1000 people
-                    self._set_state(ControllerState.PAUSED)
+                    new_state = ControllerState.PAUSED
                 case ControllerState.PAUSED:
                     # From PAUSED, M always returns to ACTIVE
                     # Supervisor is giving control back to the system
-                    self._set_state(ControllerState.ACTIVE)
+                    new_state = ControllerState.ACTIVE
+
+            if new_state:
+                self._set_state(new_state)
+                # Ensure VAD shows inactive when paused
+                if new_state == ControllerState.PAUSED:
+                    self._vad_active.clear()
             return
 
         # Handle arrow keys - manual intervention detection
@@ -187,14 +354,30 @@ class PresentationController:
             # Update current section based on arrow key pressed
             with self.section_lock:
                 current_idx = self.current_section.section_index
+                direction = 1 if key == Key.right else -1
+
                 if key == Key.right and current_idx < len(self.sections):
-                    # Move forward (OS already moved the slide)
                     new_idx = min(current_idx + 1, len(self.sections))
                     self.current_section = self.sections[new_idx - 1]
                 elif key == Key.left and current_idx > 1:
-                    # Move backward (OS already moved the slide)
                     new_idx = max(current_idx - 1, 1)
                     self.current_section = self.sections[new_idx - 1]
+                else:
+                    direction = 0  # Bound reached
+
+                # Update cumulative manual delta and timer
+                if direction != 0:
+                    now = time.time()
+                    # If same direction and within 1s, increment. Otherwise restart.
+                    if (
+                        now < self._manual_delta_expiry
+                        and (self._manual_delta * direction) > 0
+                    ):
+                        self._manual_delta += direction
+                    else:
+                        self._manual_delta = direction
+
+                    self._manual_delta_expiry = now + 1.0  # Reset 1s timer
 
             match current_state:
                 case ControllerState.ACTIVE:
@@ -212,7 +395,7 @@ class PresentationController:
         """VAD-gated audio sampling: only speech passes to STT."""
         # When PAUSED, don't process audio at all (mic effectively muted)
         if self._get_state() == ControllerState.PAUSED:
-            print("\r[VAD] ⏸️ PAUSED  ", end="", flush=True)
+            self._vad_active.clear()
             return
 
         samples = indata[:, 0].copy()
@@ -226,10 +409,6 @@ class PresentationController:
             self._vad_active.set()
         else:
             self._vad_active.clear()
-
-        # Print VAD status every 100ms (inline overwrite with \r)
-        vad_status = "🎙️ SPEECH" if is_speech else "🔇 SILENT"
-        print(f"\r[VAD] {vad_status}  ", end="", flush=True)
 
         # Only send to STT if speech is detected (filters crowd noise, coughs, applause)
         if is_speech:
@@ -259,8 +438,11 @@ class PresentationController:
                         # Update sliding window buffer (thread-safe)
                         with self._word_buffer_lock:
                             self._word_buffer.extend(new_words)
-                            # Keep only last window_size words
+                            self._display_buffer.extend(new_words)
+
+                            # Keep logic buffer small, display buffer large
                             self._word_buffer = self._word_buffer[-self.window_size :]
+                            self._display_buffer = self._display_buffer[-100:]
 
                             # Prepare words for matching
                             buffer_text = " ".join(self._word_buffer)
@@ -285,7 +467,7 @@ class PresentationController:
             except Empty:
                 continue
             except Exception as e:
-                typer.echo(output(f"Error in STT Processor thread: {e}"), err=True)
+                self._console.print(f"[bold red]Error in STT Processor thread:[/] {e}")
                 self.shutdown_flag.set()
 
     def _navigator_task(self) -> None:
@@ -325,44 +507,23 @@ class PresentationController:
                 # Get current state for display and logic
                 current_state = self._get_state()
 
-                slide_position = f"{current_section.section_index}/{len(self.sections)}"
-                similarity_pct = f"%{int(top_match.score * 100)}"
+                # Prepare display data and cache for UI persistence
+                speech_display = self._display_buffer[-100:]
+                # We want to show the full current section text in the match area
+                match_display = current_section.content.strip().split()
 
-                match (top_match.score >= self.SIMILARITY_THRESHOLD, slide_delta):
-                    case (False, _):
-                        status = "✖"
-                    case (True, 0):
-                        status = "■"
-                    case (True, delta) if delta > 0:
-                        status = f"▶ {abs(delta)}"
-                    case (True, delta):
-                        status = f"◀ {abs(delta)}"
-
-                speech_preview = " ".join(current_words[-self.DISPLAY_WORD_COUNT :])
-                match_words = best_chunk.partial_content.strip().split()
-                match_preview = " ".join(match_words[-self.DISPLAY_WORD_COUNT :])
-
-                # VAD status indicator
-                vad_indicator = "🎙️" if self._vad_active.is_set() else "🔇"
-
-                # Buffer status (word count in sliding window)
-                with self._word_buffer_lock:
-                    buffer_count = len(self._word_buffer)
-
-                # Clear inline VAD status line before printing full output
-                print("\r" + " " * 20 + "\r", end="", flush=True)
-                typer.echo(
-                    output(
-                        f"{slide_position} | {similarity_pct} | {status} | {vad_indicator} | [{buffer_count}w] | {current_state}\n"
-                        f"    Speech → ...{speech_preview}\n"
-                        f"    Match  → ...{match_preview}\n"
-                    )
-                )
+                # Cache values for manual navigation UI updates
+                self._last_speech = speech_display
+                self._last_match = match_display
+                self._last_similarity = top_match.score
 
                 # State-aware navigation logic
                 if top_match.score >= self.SIMILARITY_THRESHOLD:
                     match current_state:
                         case ControllerState.ACTIVE:
+                            # If auto-navigating, clear manual delta labels
+                            if slide_delta != 0:
+                                self._manual_delta = 0
                             # Normal operation - perform navigation
                             self._perform_navigation(target_section)
                         case ControllerState.LOCKED:
@@ -379,8 +540,14 @@ class PresentationController:
             except Empty:
                 continue
             except Exception as e:
-                typer.echo(output(f"Error in Navigator thread: {e}"), err=True)
+                self._console.print(f"[bold red]Error in Navigator thread:[/] {e}")
                 self.shutdown_flag.set()
+
+    def _update_display(self, data: UIData) -> None:
+        """Update the Rich Live display with current state."""
+        if self._live is not None:
+            frame = _build_frame(data, self._console.width)
+            self._live.update(frame, refresh=True)
 
     def _perform_navigation(self, target_section: Section) -> None:
         """Navigate to target section with echo suppression.
@@ -419,37 +586,68 @@ class PresentationController:
         keyboard_listener = Listener(on_press=self._on_key_press)
         keyboard_listener.start()
 
-        # Display startup message with controls
-        typer.echo(
-            output(
-                "\n╭─ Manual Controls ─────────────────────────────────────╮\n"
-                "│  [M] Pause/Resume    [← →] Manual Navigation         │\n"
-                "│  [Ctrl+C] Quit                                       │\n"
-                "╰───────────────────────────────────────────────────────╯\n"
-            )
+        # Create initial UI frame
+        initial_data = UIData(
+            state=self._get_state(),
+            slide=self.current_section.section_index,
+            total=len(self.sections),
+            similarity=0.0,
+            delta=0,
+            speech=[],
+            match=[],
+            vad=False,
         )
 
         try:
-            with sd.InputStream(
-                samplerate=self.SAMPLE_RATE,
-                blocksize=blocksize,
-                dtype="float32",
-                channels=1,
-                callback=self._audio_sampler_callback,
-                latency="low",
-            ):
-                while not self.shutdown_flag.is_set():
-                    self.shutdown_flag.wait(timeout=self.SHUTDOWN_CHECK_INTERVAL)
+            with Live(
+                _build_frame(initial_data, self._console.width),
+                console=self._console,
+                screen=True,
+                auto_refresh=False,
+            ) as self._live:
+                with sd.InputStream(
+                    samplerate=self.SAMPLE_RATE,
+                    blocksize=blocksize,
+                    dtype="float32",
+                    channels=1,
+                    callback=self._audio_sampler_callback,
+                    latency="low",
+                ):
+                    while not self.shutdown_flag.is_set():
+                        # --- UI Heartbeat & State Check ---
+                        now = time.time()
+
+                        # Handle manual delta expiry
+                        if now >= self._manual_delta_expiry:
+                            self._manual_delta = 0
+
+                        # Construct current UI data
+                        with self.section_lock:
+                            current_state = self._get_state()
+                            ui_data = UIData(
+                                state=current_state,
+                                slide=self.current_section.section_index,
+                                total=len(self.sections),
+                                similarity=self._last_similarity,
+                                delta=self._manual_delta,
+                                speech=self._last_speech,
+                                match=self._last_match,
+                                vad=self._vad_active.is_set(),
+                            )
+
+                        self._update_display(ui_data)
+
+                        # Wait for next refresh (100ms Heartbeat)
+                        self.shutdown_flag.wait(timeout=0.1)
 
         except KeyboardInterrupt:
-            typer.echo(output("\nShutting down..."))
+            pass  # Clean exit on Ctrl+C
         except Exception as e:
-            typer.echo(
-                output(f"\nAn error occurred in the audio stream: {e}"), err=True
-            )
+            self._console.print(f"[bold red]Audio stream error:[/] {e}")
 
         finally:
             self.shutdown_flag.set()
+            self._live = None  # Clear live reference
 
             # Stop keyboard listener
             keyboard_listener.stop()
@@ -460,4 +658,4 @@ class PresentationController:
                 if thread.is_alive():
                     thread.join(timeout=self.THREAD_JOIN_TIMEOUT)
 
-            typer.echo(output("Shut down successfully."))
+            self._console.print("[accent]Presentation ended.[/]")
