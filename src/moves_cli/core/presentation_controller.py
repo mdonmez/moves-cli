@@ -2,12 +2,13 @@ import asyncio
 import threading
 import time
 from contextlib import suppress
+from enum import StrEnum
 from pathlib import Path
 from queue import Empty, Full, Queue
-import typer
 
 import sounddevice as sd
-from pynput.keyboard import Controller, Key
+import typer
+from pynput.keyboard import Controller, Key, Listener
 from sherpa_onnx import OnlineRecognizer, VadModelConfig, VoiceActivityDetector
 
 from moves_cli.config import SIMILARITY_THRESHOLD, WINDOW_SIZE
@@ -16,6 +17,14 @@ from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.models import Section, SttModel, VadModel
 from moves_cli.utils import model_preparer, text_normalizer
 from moves_cli.utils.formatters import output
+
+
+class ControllerState(StrEnum):
+    """State machine states for presentation control."""
+
+    ACTIVE = "ACTIVE"  # Normal operation - listening, auto-navigation enabled
+    PAUSED = "PAUSED"  # Microphone paused - no processing, keyboard still listened
+    LOCKED = "LOCKED"  # Manual override - listening but navigation disabled
 
 
 class PresentationController:
@@ -33,12 +42,10 @@ class PresentationController:
     SHUTDOWN_CHECK_INTERVAL: float = 0.5
     MODEL_DIR: Path = SttModel.model_dir
     VAD_MODEL_DIR: Path = VadModel.model_dir
-    # VAD configuration (optimized for noisy environments like 1000+ person venues)
-    VAD_THRESHOLD: float = 0.5  # Higher = less sensitive (filters clicks/noise)
-    VAD_MIN_SILENCE: float = 0.3  # Seconds of silence to end speech segment
-    VAD_MIN_SPEECH: float = (
-        0.15  # Minimum speech duration to detect (filters short noises)
-    )
+    # VAD configuration (tuned for office/home environments)
+    VAD_THRESHOLD: float = 0.35  # Lower = more sensitive to speech
+    VAD_MIN_SILENCE: float = 0.5  # Seconds of silence to end speech segment
+    VAD_MIN_SPEECH: float = 0.1  # Minimum speech duration to detect
     VAD_WINDOW_SIZE: int = 512  # ~32ms analysis window at 16kHz
     VAD_BUFFER_SIZE: float = 30.0  # Circular buffer size in seconds
     # from config.py
@@ -92,6 +99,13 @@ class PresentationController:
         self.section_lock = threading.Lock()
         self.shutdown_flag = threading.Event()
 
+        # State machine for manual controls
+        self._state = ControllerState.ACTIVE
+        self._state_lock = threading.Lock()
+
+        # Echo suppression: prevents our own key presses from triggering state changes
+        self._echo_suppression = threading.Event()
+
         # VAD status flag for display (atomic bool via Event for thread-safety)
         self._vad_active = threading.Event()
 
@@ -121,8 +135,86 @@ class PresentationController:
             target=self._navigator_task, daemon=True
         )
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # State Machine Methods
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _get_state(self) -> ControllerState:
+        """Thread-safe state getter."""
+        with self._state_lock:
+            return self._state
+
+    def _set_state(self, new_state: ControllerState) -> None:
+        """Thread-safe state setter with logging."""
+        with self._state_lock:
+            if self._state != new_state:
+                old_state = self._state
+                self._state = new_state
+                # Clear the VAD line and print state change
+                print("\r" + " " * 20 + "\r", end="", flush=True)
+                typer.echo(output(f"State: {old_state} → {new_state}"))
+
+    def _on_key_press(self, key: Key) -> None:
+        """Global keyboard listener callback for manual controls.
+
+        Handles:
+        - M key: Toggle between PAUSED and ACTIVE states
+        - Arrow keys: Detect manual intervention, transition to LOCKED
+        """
+        # Ignore our own key presses (echo prevention)
+        if self._echo_suppression.is_set():
+            return
+
+        current_state = self._get_state()
+
+        # Handle M key - pause/resume toggle
+        if hasattr(key, "char") and key.char == "m":
+            match current_state:
+                case ControllerState.ACTIVE:
+                    self._set_state(ControllerState.PAUSED)
+                case ControllerState.LOCKED:
+                    # IMPORTANT: From LOCKED, M goes to PAUSED (not ACTIVE)
+                    # Supervisor likely wants full control in front of 1000 people
+                    self._set_state(ControllerState.PAUSED)
+                case ControllerState.PAUSED:
+                    # From PAUSED, M always returns to ACTIVE
+                    # Supervisor is giving control back to the system
+                    self._set_state(ControllerState.ACTIVE)
+            return
+
+        # Handle arrow keys - manual intervention detection
+        if key in (Key.left, Key.right):
+            # Update current section based on arrow key pressed
+            with self.section_lock:
+                current_idx = self.current_section.section_index
+                if key == Key.right and current_idx < len(self.sections):
+                    # Move forward (OS already moved the slide)
+                    new_idx = min(current_idx + 1, len(self.sections))
+                    self.current_section = self.sections[new_idx - 1]
+                elif key == Key.left and current_idx > 1:
+                    # Move backward (OS already moved the slide)
+                    new_idx = max(current_idx - 1, 1)
+                    self.current_section = self.sections[new_idx - 1]
+
+            match current_state:
+                case ControllerState.ACTIVE:
+                    # Manual intervention detected - lock navigation
+                    self._set_state(ControllerState.LOCKED)
+                case ControllerState.LOCKED | ControllerState.PAUSED:
+                    # Already locked or paused - just track the movement
+                    pass
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Audio & Processing Methods
+    # ─────────────────────────────────────────────────────────────────────────
+
     def _audio_sampler_callback(self, indata, _frames, _time, _status) -> None:
         """VAD-gated audio sampling: only speech passes to STT."""
+        # When PAUSED, don't process audio at all (mic effectively muted)
+        if self._get_state() == ControllerState.PAUSED:
+            print("\r[VAD] ⏸️ PAUSED  ", end="", flush=True)
+            return
+
         samples = indata[:, 0].copy()
 
         # Feed samples to VAD for speech detection
@@ -197,7 +289,7 @@ class PresentationController:
                 self.shutdown_flag.set()
 
     def _navigator_task(self) -> None:
-        previous_words = []
+        previous_words: list[str] = []
         while not self.shutdown_flag.is_set():
             try:
                 # get the words from the queue
@@ -230,6 +322,9 @@ class PresentationController:
                     target_section.section_index - current_section.section_index
                 )
 
+                # Get current state for display and logic
+                current_state = self._get_state()
+
                 slide_position = f"{current_section.section_index}/{len(self.sections)}"
                 similarity_pct = f"%{int(top_match.score * 100)}"
 
@@ -258,15 +353,26 @@ class PresentationController:
                 print("\r" + " " * 20 + "\r", end="", flush=True)
                 typer.echo(
                     output(
-                        f"{slide_position} | {similarity_pct} | {status} | {vad_indicator} | [{buffer_count}w]\n"
+                        f"{slide_position} | {similarity_pct} | {status} | {vad_indicator} | [{buffer_count}w] | {current_state}\n"
                         f"    Speech → ...{speech_preview}\n"
                         f"    Match  → ...{match_preview}\n"
                     )
                 )
 
-                # if the similarity is above the threshold, then act
+                # State-aware navigation logic
                 if top_match.score >= self.SIMILARITY_THRESHOLD:
-                    self._perform_navigation(target_section)
+                    match current_state:
+                        case ControllerState.ACTIVE:
+                            # Normal operation - perform navigation
+                            self._perform_navigation(target_section)
+                        case ControllerState.LOCKED:
+                            # Check for consensus: if top match equals current section, unlock
+                            if slide_delta == 0:
+                                self._set_state(ControllerState.ACTIVE)
+                            # Otherwise stay locked, don't navigate
+                        case ControllerState.PAUSED:
+                            # No action - system is paused
+                            pass
 
                 previous_words = current_words
 
@@ -277,29 +383,53 @@ class PresentationController:
                 self.shutdown_flag.set()
 
     def _perform_navigation(self, target_section: Section) -> None:
+        """Navigate to target section with echo suppression.
+
+        Echo suppression prevents our own key presses from triggering
+        the keyboard listener (which would incorrectly transition to LOCKED).
+        """
         with self.section_lock:
             current_slide = self.current_section.section_index
             target_slide = target_section.section_index
             slide_delta = target_slide - current_slide
 
             if slide_delta != 0:
-                # if the slide delta is positive, press right arrow key, otherwise press left arrow key
-                key_to_press = Key.right if slide_delta > 0 else Key.left
-                for _ in range(abs(slide_delta)):
-                    self.keyboard_controller.press(key_to_press)
-                    self.keyboard_controller.release(key_to_press)
-                    time.sleep(self.KEY_PRESS_DELAY)
+                # Enable echo suppression before pressing keys
+                self._echo_suppression.set()
+                try:
+                    key_to_press = Key.right if slide_delta > 0 else Key.left
+                    for _ in range(abs(slide_delta)):
+                        self.keyboard_controller.press(key_to_press)
+                        self.keyboard_controller.release(key_to_press)
+                        time.sleep(self.KEY_PRESS_DELAY)
+                finally:
+                    # Always clear echo suppression
+                    self._echo_suppression.clear()
 
             self.current_section = target_section
 
     def control(self) -> None:
+        """Main control loop with keyboard listener and audio processing."""
         self.stt_processor_thread.start()
         self.navigator_thread.start()
 
         blocksize = int(self.SAMPLE_RATE * self.FRAME_DURATION)
 
+        # Start global keyboard listener for manual controls
+        keyboard_listener = Listener(on_press=self._on_key_press)
+        keyboard_listener.start()
+
+        # Display startup message with controls
+        typer.echo(
+            output(
+                "\n╭─ Manual Controls ─────────────────────────────────────╮\n"
+                "│  [M] Pause/Resume    [← →] Manual Navigation         │\n"
+                "│  [Ctrl+C] Quit                                       │\n"
+                "╰───────────────────────────────────────────────────────╯\n"
+            )
+        )
+
         try:
-            # some audio config, i should move some of them to the top
             with sd.InputStream(
                 samplerate=self.SAMPLE_RATE,
                 blocksize=blocksize,
@@ -321,7 +451,10 @@ class PresentationController:
         finally:
             self.shutdown_flag.set()
 
-            # gracefully shutdown the threads
+            # Stop keyboard listener
+            keyboard_listener.stop()
+
+            # Gracefully shutdown the threads
             threads_to_join = [self.stt_processor_thread, self.navigator_thread]
             for thread in threads_to_join:
                 if thread.is_alive():
