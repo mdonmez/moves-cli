@@ -38,7 +38,7 @@ class Speaker:
     presentation_hash: str | None = None  # xxh3_64 hash of source at last process
     transcript_hash: str | None = None  # xxh3_64 hash of source at last process
     sections_hash: str | None = (
-        None  # xxh3_64 hash of sections.yaml at last process/control
+        None  # xxh3_64 hash of normalized sections.md at last process/control
     )
 
     # useful properties

@@ -53,6 +53,19 @@ class SpeakerManager:
                 hasher.update(chunk)
         return hasher.hexdigest()
 
+    @staticmethod
+    def compute_normalized_sections_hash(file_path: Path) -> str:
+        """Compute xxh3_64 hash of normalized sections content.
+
+        Uses markdown_to_plain_text to strip formatting before hashing,
+        so whitespace/formatting differences don't affect the checksum.
+        """
+        from moves_cli.utils.formatters import markdown_to_plain_text
+
+        content = file_path.read_text(encoding="utf-8")
+        normalized = markdown_to_plain_text(content)
+        return xxhash.xxh3_64(normalized.encode("utf-8")).hexdigest()
+
     def _write_speaker_yaml(self, path: Path, speaker: Speaker) -> None:
         from ruamel.yaml import YAML
 
@@ -276,7 +289,7 @@ class SpeakerManager:
                 # Write sections file
                 self.data_handler.write(
                     speaker_path / SECTIONS_FILENAME,
-                    section_producer.convert_to_yaml(sections),
+                    section_producer.convert_to_markdown(sections),
                 )
 
                 processing_time = time.perf_counter() - start_time
@@ -285,7 +298,9 @@ class SpeakerManager:
                 speaker.last_processed = datetime.now().isoformat()
                 speaker.presentation_hash = presentation_hash
                 speaker.transcript_hash = None
-                sections_hash = self.compute_file_hash(speaker_path / SECTIONS_FILENAME)
+                sections_hash = self.compute_normalized_sections_hash(
+                    speaker_path / SECTIONS_FILENAME
+                )
                 speaker.sections_hash = sections_hash
                 self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
 
@@ -369,7 +384,7 @@ class SpeakerManager:
                 progress_callback("Writing to file...")
                 self.data_handler.write(
                     speaker_path / SECTIONS_FILENAME,
-                    section_producer.convert_to_yaml(sections),
+                    section_producer.convert_to_markdown(sections),
                 )
 
                 processing_time = time.perf_counter() - start_time
@@ -385,7 +400,9 @@ class SpeakerManager:
                 speaker.last_processed = datetime.now().isoformat()
                 speaker.presentation_hash = presentation_hash
                 speaker.transcript_hash = transcript_hash
-                sections_hash = self.compute_file_hash(speaker_path / SECTIONS_FILENAME)
+                sections_hash = self.compute_normalized_sections_hash(
+                    speaker_path / SECTIONS_FILENAME
+                )
                 speaker.sections_hash = sections_hash
                 self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
 

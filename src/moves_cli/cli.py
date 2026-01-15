@@ -338,7 +338,7 @@ def speaker_prepare(
             if manual:
                 typer.echo(
                     output(
-                        f"{result.section_count} empty sections created. Edit sections.yaml to add speech content."
+                        f"{result.section_count} empty sections created. Edit sections.md to add speech content."
                     )
                 )
                 typer.echo()
@@ -364,7 +364,7 @@ def speaker_prepare(
 
                 typer.echo(output(None, manual_results))
                 typer.echo()
-                typer.echo(output("Edit sections.yaml files to add speech content."))
+                typer.echo(output("Edit sections.md files to add speech content."))
             else:
                 # Auto mode: show section counts with timing
                 total_time = sum(result.processing_time_seconds for result in results)
@@ -564,15 +564,15 @@ def present(
                 raise typer.Abort()
             typer.echo()
 
-        # Check if sections.yaml has been manually modified since last process/control
+        # Check if sections.md has been manually modified since last process/control
         if resolved_speaker.sections_hash:
-            current_sections_hash = SpeakerManager.compute_file_hash(
+            current_sections_hash = SpeakerManager.compute_normalized_sections_hash(
                 resolved_speaker.sections_file
             )
             if current_sections_hash != resolved_speaker.sections_hash:
                 typer.echo(
                     output(
-                        "Warning: sections.yaml has been modified since last processing.",
+                        "Warning: sections.md has been modified since last processing.",
                         "This may be intentional (manual edits) or accidental.",
                     ),
                     err=True,
@@ -602,7 +602,7 @@ def present(
         from moves_cli.core.components.section_producer import SectionProducer
 
         sec_producer = SectionProducer()
-        sections = sec_producer.load_from_yaml(
+        sections = sec_producer.load_from_markdown(
             data_handler.read(resolved_speaker.sections_file)
         )
 

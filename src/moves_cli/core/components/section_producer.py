@@ -1,5 +1,4 @@
 from importlib.resources import files
-from io import StringIO
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -161,53 +160,52 @@ class SectionProducer:
         except Exception as e:
             raise RuntimeError(f"LLM call failed: {e}") from e
 
-    def convert_to_yaml(self, sections: list[Section]) -> str:
-        # i have no idea about this writing code, but works perfect
+    def convert_to_markdown(self, sections: list[Section]) -> str:
+        """Convert sections to markdown format.
 
-        from ruamel.yaml import YAML
-        from ruamel.yaml.comments import CommentedSeq
-        from ruamel.yaml.scalarstring import FoldedScalarString
+        Format:
+            # 1. Slide
 
-        def to_folded(content: str) -> str | FoldedScalarString:
-            if not content or not content.strip():
-                return ""
-            text = content if content.endswith("\n") else content + "\n"
-            return FoldedScalarString(text)
+            Section content here...
 
-        yaml_data = CommentedSeq()
-        for idx, section in enumerate(sections):
-            yaml_data.append(
-                {
-                    "section_index": section.section_index,
-                    "content": to_folded(section.content),
-                }
-            )
-            if idx > 0:
-                yaml_data.yaml_set_comment_before_after_key(idx, before="\n")
+            # 2. Slide
 
-        yaml = YAML()
-        yaml.default_flow_style = False
-        yaml.width = 80
+            Another section content...
+        """
+        lines: list[str] = []
+        for section in sections:
+            lines.append(f"# {section.section_index}. Slide")
+            lines.append("")
+            if section.content.strip():
+                lines.append(section.content.strip())
+                lines.append("")
 
-        output = StringIO()
-        yaml.dump(yaml_data, output)
-        return output.getvalue()
+        return "\n".join(lines)
 
-    def load_from_yaml(self, yaml_content: str) -> list[Section]:
-        # this loads the yaml content into a list of Section objects
+    def load_from_markdown(self, markdown_content: str) -> list[Section]:
+        """Load sections from markdown format.
 
-        from ruamel.yaml import YAML
+        Parses `# N. Slide` headings as section indices, content follows until next heading.
+        """
+        import re
 
-        yaml = YAML()
-        data = yaml.load(StringIO(yaml_content))
+        sections: list[Section] = []
+        # Split by heading pattern, keeping the delimiter
+        pattern = r"^#\s+(\d+)\.\s*Slide\s*$"
+        parts = re.split(pattern, markdown_content, flags=re.MULTILINE)
 
-        return [
-            Section(
-                content=str(item["content"]),
-                section_index=int(item["section_index"]),
-            )
-            for item in data
-        ]
+        # parts[0] is content before first heading (usually empty)
+        # parts[1], parts[2] = first index, first content
+        # parts[3], parts[4] = second index, second content, etc.
+
+        i = 1
+        while i < len(parts) - 1:
+            section_index = int(parts[i])
+            content = parts[i + 1].strip()
+            sections.append(Section(section_index=section_index, content=content))
+            i += 2
+
+        return sections
 
     def generate_sections(
         self,
