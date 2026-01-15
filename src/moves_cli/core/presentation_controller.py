@@ -367,6 +367,10 @@ class PresentationController:
 
                 # Update cumulative manual delta and timer
                 if direction != 0:
+                    # Clear display buffer on slide change (visual reset only)
+                    self._display_buffer = []
+                    self._last_speech = []
+
                     now = time.time()
                     # If same direction and within 1s, increment. Otherwise restart.
                     if (
@@ -561,6 +565,10 @@ class PresentationController:
             slide_delta = target_slide - current_slide
 
             if slide_delta != 0:
+                # Clear display buffer on slide change (visual reset only)
+                self._display_buffer = []
+                self._last_speech = []
+
                 # Enable echo suppression before pressing keys
                 self._echo_suppression.set()
                 try:
