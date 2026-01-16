@@ -133,6 +133,16 @@ class SectionProducer:
             )
 
         try:
+            import warnings
+
+            # silence harmless pydantic serialization warnings from litellm/instructor
+            # see: https://github.com/BerriAI/litellm/issues/11759
+            warnings.filterwarnings(
+                "ignore",
+                message="Pydantic serializer warnings",
+                category=UserWarning,
+            )
+
             # hmm, i need to rewrite this system prompt for broader use cases, current one is too restrictive
             system_prompt = (
                 files("moves_cli.data").joinpath("llm_instruction.md").read_text()

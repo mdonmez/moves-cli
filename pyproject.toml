@@ -21,11 +21,13 @@ dependencies = [
     "pymupdf>=1.26.7",
     "rapidfuzz>=3.14.3",
     "rich>=14.2.0",
+    "ruamel-yaml>=0.19.1",
     "sherpa-onnx>=1.12.23",
     "sherpa-onnx-core>=1.12.23",
     "sounddevice>=0.5.3",
     "tomlkit>=0.14.0",
     "typer>=0.21.1",
+    "unidecode>=1.4.0",
     "xxhash>=3.6.0",
 ]
 
