@@ -19,6 +19,7 @@ dependencies = [
     "numpy>=2.4.1",
     "pydantic>=2.12.5",
     "pymupdf>=1.26.7",
+    "pynput>=1.8.1",
     "rapidfuzz>=3.14.3",
     "rich>=14.2.0",
     "ruamel-yaml>=0.19.1",

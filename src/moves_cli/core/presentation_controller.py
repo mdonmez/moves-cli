@@ -81,17 +81,9 @@ class UIData:
 # =============================================================================
 # UI Builder Functions
 # =============================================================================
-def _scrolling_text(words: list[str], icon: str, width: int) -> Text:
-    """Create a scrolling text line with left truncation when overflow."""
+def _format_speech_text(words: list[str], icon: str) -> Text:
+    """Create a wrapped speech text block."""
     text = " ".join(words)
-    # Account for: icon(1) + space(1) + panel border(2) + padding(2)
-    avail = width - 6
-
-    if len(text) >= avail:
-        # Overflow: truncate from left, show ellipsis
-        truncated = text[-(avail - 1) :]
-        return Text.from_markup(f"{icon} [muted]…[/][text]{truncated}[/]")
-    # Normal: left-aligned
     return Text.from_markup(f"{icon} [text]{text}[/]")
 
 
@@ -128,12 +120,12 @@ def _build_header(d: UIData) -> Table:
     return grid
 
 
-def _build_content(d: UIData, width: int) -> Group:
-    """Build the content section: One-line Scrolling Speech + Full Section Text."""
+def _build_content(d: UIData) -> Group:
+    """Build the content section: Wrapped Speech + Full Section Text."""
     vad_icon = "●" if d.vad else "○"
 
-    # --- Speech Block (Single Line Scrolling) ---
-    speech_display = _scrolling_text(d.speech, vad_icon, width)
+    # --- Speech Block (Wrapped) ---
+    speech_display = _format_speech_text(d.speech, vad_icon)
 
     # --- Match/Section Block (Full Text) ---
     section_text = " ".join(d.match)
@@ -155,13 +147,13 @@ def _build_footer() -> Align:
     )
 
 
-def _build_frame(d: UIData, width: int) -> Panel:
+def _build_frame(d: UIData) -> Panel:
     """Assemble the complete dashboard frame."""
     return Panel(
         Group(
             _build_header(d),
             Rule(style="muted"),
-            _build_content(d, width),
+            _build_content(d),
             Rule(style="muted"),
             _build_footer(),
         ),
@@ -550,7 +542,7 @@ class PresentationController:
     def _update_display(self, data: UIData) -> None:
         """Update the Rich Live display with current state."""
         if self._live is not None:
-            frame = _build_frame(data, self._console.width)
+            frame = _build_frame(data)
             self._live.update(frame, refresh=True)
 
     def _perform_navigation(self, target_section: Section) -> None:
@@ -608,7 +600,7 @@ class PresentationController:
 
         try:
             with Live(
-                _build_frame(initial_data, self._console.width),
+                _build_frame(initial_data),
                 console=self._console,
                 screen=True,
                 auto_refresh=False,
