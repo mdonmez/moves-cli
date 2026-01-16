@@ -5,9 +5,11 @@ DATA_FOLDER: Path = Path.home() / ".moves"
 SECTIONS_FILENAME: str = "sections.md"
 SPEAKER_FILENAME: str = "speaker.yaml"
 
-# Speaker ID generation
+# ID generation
 SPEAKER_ID_SUFFIX_LENGTH: int = 5
 SPEAKER_ID_GENERATION_MAX_RETRIES: int = 3
+ID_BATCH_SIZE: int = 1000
+CHUNK_ID_LENGTH: int = 16
 
 # Similarity calculator configuration
 SEMANTIC_WEIGHT: float = 0.6
