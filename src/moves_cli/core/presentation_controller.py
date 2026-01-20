@@ -272,8 +272,9 @@ class PresentationController:
             target=self._navigator_task, daemon=True
         )
 
-        # Rich UI console and live display
-        self._console = Console(theme=THEME)
+        # Rich UI console and live display - created lazily in control() to avoid
+        # interfering with typer prompts before presentation starts
+        self._console: Console | None = None
         self._live: Live | None = None
 
         # Cache last displayed content for UI persistence during manual actions
@@ -581,6 +582,9 @@ class PresentationController:
         self.navigator_thread.start()
 
         blocksize = int(self.SAMPLE_RATE * self.FRAME_DURATION)
+
+        # Create console before starting threads so they can use it for error messages
+        self._console = Console(theme=THEME)
 
         # Start global keyboard listener for manual controls
         keyboard_listener = Listener(on_press=self._on_key_press)

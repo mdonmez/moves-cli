@@ -21,7 +21,7 @@ HTTP_TIMEOUT = 30.0
 MAX_CONCURRENT_DOWNLOADS = 4
 MODELS = [EmbeddingModel, SttModel, VadModel]
 
-console = Console(highlight=False, color_system=None)
+console = Console(stderr=True, highlight=False, force_terminal=True)
 
 
 def _verify_checksum_sync(filepath: Path, expected: str) -> bool:
@@ -105,22 +105,28 @@ async def _download_file(
 
         is_valid = await asyncio.to_thread(_verify_checksum_sync, filepath, checksum)
         if not is_valid:
-            progress.update(task_id, description=f"[red]Corrupt: {filepath.name}")
+            progress.update(task_id, description=f"Corrupt: {filepath.name}")
             filepath.unlink(missing_ok=True)
             raise RuntimeError(f"Checksum mismatch: {filepath.name}")
 
         progress.update(task_id, visible=False)
 
     except Exception as e:
-        progress.update(task_id, description=f"[red]Failed: {filepath.name}")
+        progress.update(task_id, description=f"Failed: {filepath.name}")
         temp_path.unlink(missing_ok=True)
         raise RuntimeError(f"Download failed: {url}") from e
 
 
 async def prepare_models() -> bool:
-    _clean_model_directory()
+    from rich.live import Live
+    from rich.spinner import Spinner
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+    spinner = Spinner("dots", text="Loading models")
+
+    with Live(spinner, console=console, refresh_per_second=10, transient=True):
+        pass
 
     async with httpx.AsyncClient(
         timeout=HTTP_TIMEOUT,
@@ -128,12 +134,13 @@ async def prepare_models() -> bool:
         limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
     ) as client:
         with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            DownloadColumn(),
+            SpinnerColumn("dots"),
+            TextColumn("{task.description}"),
+            BarColumn(complete_style="white", finished_style="white"),
             TaskProgressColumn(),
+            DownloadColumn(),
             console=console,
+            transient=True,
         ) as progress:
             tasks = [
                 _download_file(

@@ -104,6 +104,7 @@ EmbeddingModel = MlModel(
     model_dir=DATA_FOLDER / "ml_models" / "all-MiniLM-L6-v2_quint8_avx2",
 )
 
+# NEMO MODEL 480 MS ITS NEARLY 
 SttModel = MlModel(
     name="sherpa-onnx-nemo-streaming-fast-conformer-transducer-en-480ms",
     base_url="https://github.com/mdonmez/moves-cli/raw/refs/heads/master/src/moves_cli/data/ml_models/nemo-streaming-stt-480ms-int8",
@@ -113,7 +114,9 @@ SttModel = MlModel(
         "joiner.int8.onnx": "84a3ae887bf7b986",
         "tokens.txt": "14f59574d9b3e62f",
     },
-    model_dir=DATA_FOLDER / "ml_models" / "nemo-streaming-stt-480ms-int8",
+    model_dir=DATA_FOLDER
+    / "ml_models"
+    / "nemo-streaming-fast-conformer-transducer-en-480ms-int8",
 )
 
 VadModel = MlModel(

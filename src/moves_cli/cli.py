@@ -10,6 +10,14 @@ from moves_cli.utils.data_handler import DataHandler
 from moves_cli.utils.formatters import format_datetime, output
 
 
+def _safe_echo(message: str | None = None, err: bool = False) -> None:
+    """Echo a message safely, handling Windows console errors."""
+    try:
+        typer.echo(message, err=err)
+    except OSError:
+        pass
+
+
 def speaker_manager_instance():
     from moves_cli.core.speaker_manager import SpeakerManager
 
@@ -362,7 +370,7 @@ def speaker_prepare(
                         f"{result.section_count} empty sections → {speaker.sections_file}"
                     )
 
-                typer.echo(output(None, manual_results))
+                typer.echo(output(manual_results))
                 typer.echo()
                 typer.echo(output("Edit sections.md files to add speech content."))
             else:
@@ -375,7 +383,7 @@ def speaker_prepare(
                         f"{result.section_count} sections ({result.processing_time_seconds:.1f}s)"
                     )
 
-                typer.echo(output(None, results_dict))
+                typer.echo(output(results_dict))
                 typer.echo()
                 typer.echo(output(f"Total preparation time: {total_time:.1f} seconds."))
 
@@ -481,8 +489,6 @@ def present(
 ):
     """Start live voice-controlled presentation navigation (requires prepared speaker)"""
     try:
-        from rich.progress import Progress, SpinnerColumn, TextColumn
-
         # Get speaker manager
         speaker_manager = speaker_manager_instance()
         data_handler = DataHandler()
@@ -557,10 +563,12 @@ def present(
                     {
                         "Re-process": f"moves speaker prepare {resolved_speaker.speaker_id}"
                     },
-                ),
-                err=True,
+                )
             )
-            if not typer.confirm("Continue anyway?", default=False):
+            typer.echo()
+            if not typer.confirm(
+                "Do you want to continue with potentially outdated data?", default=False
+            ):
                 raise typer.Abort()
             typer.echo()
 
@@ -610,38 +618,25 @@ def present(
             typer.echo(output("Error: No sections found in processed data."), err=True)
             raise typer.Exit(1)
 
+        # Load models early (before section checks for faster feedback)
+        window_size = WINDOW_SIZE
+        controller = presentation_controller_instance(sections, window_size=window_size)
+
         # Check for empty sections (unfilled template from manual mode)
         empty_sections = [s for s in sections if not s.content.strip()]
         if empty_sections:
-            typer.echo(
+            _safe_echo(
                 output(
                     f"Warning: {len(empty_sections)} of {len(sections)} sections have empty content."
-                ),
-                err=True,
+                )
             )
-            typer.echo(
-                output("These slides will not respond to voice navigation."),
-                err=True,
-            )
-            typer.echo()
+            _safe_echo(output("These slides will not respond to voice navigation."))
+            _safe_echo()
             if not typer.confirm("Continue anyway?", default=False):
                 raise typer.Abort()
-            typer.echo()
+            _safe_echo()
 
-        window_size = WINDOW_SIZE
-
-        # Initialize controller with loading spinner
-        with Progress(
-            SpinnerColumn(style=""),
-            TextColumn("{task.description}"),
-            transient=True,
-        ) as progress:
-            progress.add_task(description="Starting presentation...", total=None)
-            controller = presentation_controller_instance(
-                sections, window_size=window_size
-            )
-
-        typer.echo(
+        _safe_echo(
             output(
                 f"Presentation started for {resolved_speaker.label}.",
                 "[←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit",
@@ -650,12 +645,12 @@ def present(
 
         controller.control()
 
-        typer.echo(output("\nPresentation ended.\n"))
+        _safe_echo(output("\nPresentation ended.\n"))
 
     except typer.Exit:
         raise
     except Exception as e:
-        typer.echo(output(f"Presentation error: {str(e)}"), err=True)
+        _safe_echo(output(f"Presentation error: {str(e)}"), err=True)
         raise typer.Exit(1)
 
 
