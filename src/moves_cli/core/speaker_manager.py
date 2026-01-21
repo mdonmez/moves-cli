@@ -92,7 +92,12 @@ class SpeakerManager:
         return Speaker(**data)
 
     def add(
-        self, name: str, source_presentation: Path, source_transcript: Path
+        self,
+        name: str,
+        source_presentation: Path,
+        source_transcript: Path,
+        source_presentation_original: str | None = None,
+        source_transcript_original: str | None = None,
     ) -> Speaker:
         current_speakers = self.list()
         speaker_ids = [speaker.speaker_id for speaker in current_speakers]
@@ -127,6 +132,8 @@ class SpeakerManager:
             speaker_id=speaker_id,
             source_presentation=source_presentation.resolve(),
             source_transcript=source_transcript.resolve(),
+            source_presentation_original=source_presentation_original,
+            source_transcript_original=source_transcript_original,
         )
 
         # very understandable i think
@@ -139,13 +146,17 @@ class SpeakerManager:
         speaker: Speaker,
         source_presentation: Path | None = None,
         source_transcript: Path | None = None,
+        source_presentation_original: str | None = None,
+        source_transcript_original: str | None = None,
     ) -> Speaker:
         speaker_path = self.SPEAKERS_PATH / speaker.speaker_id
 
         if source_presentation:
             speaker.source_presentation = source_presentation.resolve()
+            speaker.source_presentation_original = source_presentation_original
         if source_transcript:
             speaker.source_transcript = source_transcript.resolve()
+            speaker.source_transcript_original = source_transcript_original
 
         self._write_speaker_yaml(speaker_path / SPEAKER_FILENAME, speaker)
         return speaker
@@ -254,8 +265,8 @@ class SpeakerManager:
                     output(
                         speaker.label,
                         {
-                            "Presentation": f"{speaker.source_presentation} ({slide_count} slides)",
-                            "Transcript": speaker.source_transcript,
+                            "Presentation": f"{speaker.presentation_source_display} ({slide_count} slides)",
+                            "Transcript": speaker.transcript_source_display,
                             "Estimated tokens": f"~{token_count:,}",
                             "Estimated cost": f"{cost_str} ({llm_model})",
                         },

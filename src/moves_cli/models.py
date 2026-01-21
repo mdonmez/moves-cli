@@ -40,6 +40,9 @@ class Speaker:
     sections_hash: str | None = (
         None  # xxh3_64 hash of normalized sections.md at last process/control
     )
+    # Original source strings (for Google Drive URLs or user-provided paths)
+    source_presentation_original: str | None = None
+    source_transcript_original: str | None = None
 
     # useful properties
     @property
@@ -60,6 +63,16 @@ class Speaker:
     def speaker_file(self) -> Path:
         """Speaker metadata dosyası yolu."""
         return self.data_dir / SPEAKER_FILENAME
+
+    @property
+    def presentation_source_display(self) -> str:
+        """Display string for presentation source (original URL or path)."""
+        return self.source_presentation_original or str(self.source_presentation)
+
+    @property
+    def transcript_source_display(self) -> str:
+        """Display string for transcript source (original URL or path)."""
+        return self.source_transcript_original or str(self.source_transcript)
 
 
 @dataclass(frozen=True)
