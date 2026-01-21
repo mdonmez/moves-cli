@@ -93,7 +93,7 @@ class MlModel:
 # you changed the model and the calculated its hash manually
 EmbeddingModel = MlModel(
     name="sentence-transformers/all-MiniLM-l6-v2",
-    base_url="https://github.com/mdonmez/moves-cli/raw/refs/heads/master/src/moves_cli/data/ml_models/all-MiniLM-L6-v2_quint8_avx2",
+    base_url="https://media.githubusercontent.com/media/mdonmez/moves-cli/refs/heads/master/src/moves_cli/data/ml_models/all-MiniLM-L6-v2_quint8_avx2",
     files={
         "model.onnx": "cda38b71e6003d03",  # xxh3_64 hash
         "config.json": "ef5a8e793fd9b2f9",  # xxhash because blazingly fast and they're calculated everytime when control starts
@@ -107,7 +107,7 @@ EmbeddingModel = MlModel(
 # NEMO MODEL 480 MS ITS NEARLY
 SttModel = MlModel(
     name="sherpa-onnx-nemo-streaming-fast-conformer-transducer-en-480ms",
-    base_url="https://github.com/mdonmez/moves-cli/raw/refs/heads/master/src/moves_cli/data/ml_models/nemo-streaming-stt-480ms-int8",
+    base_url="https://media.githubusercontent.com/media/mdonmez/moves-cli/refs/heads/master/src/moves_cli/data/ml_models/nemo-streaming-stt-480ms-int8",
     files={
         "decoder.int8.onnx": "f2751a7feca481bc",  # xxh3_64 hash
         "encoder.int8.onnx": "bebeb28d3df4dfae",
