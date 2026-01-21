@@ -11,16 +11,26 @@ from moves_cli.models import Section
 
 
 class SectionProducer:
-    def _extract_pdf(
-        self, pdf_path: Path, extraction_type: Literal["transcript", "presentation"]
+    def _extract_document(
+        self, file_path: Path, extraction_type: Literal["transcript", "presentation"]
     ) -> str:
+        """Extract text from document (PDF or TXT).
+
+        Automatically detects file type. PDF uses standard extraction,
+        TXT files are opened with filetype='txt'.
+        """
         try:
             # Read file into memory first (snapshot) - protects against file changes/deletion
-            data = pdf_path.read_bytes()
-            with pymupdf.open(stream=data, filetype="pdf") as doc:
+            data = file_path.read_bytes()
+
+            # Detect file type from extension
+            suffix = file_path.suffix.lower()
+            filetype = "txt" if suffix == ".txt" else "pdf"
+
+            with pymupdf.open(stream=data, filetype=filetype) as doc:
                 match extraction_type:
                     case "transcript":
-                        # extract all text from pdf and remove extra spaces, one line full text just.
+                        # extract all text from document and remove extra spaces, one line full text just.
                         full_text = "".join(page.get_text("text") for page in doc)  # type: ignore
                         result = " ".join(full_text.split())
                         return result
@@ -38,7 +48,7 @@ class SectionProducer:
                         return "\n\n".join(markdown_sections)
         except Exception as e:
             raise RuntimeError(
-                f"PDF extraction failed for {pdf_path} ({extraction_type}): {e}"
+                f"Document extraction failed for {file_path} ({extraction_type}): {e}"
             ) from e
 
     def generate_template(self, presentation_path: Path) -> list[Section]:
@@ -74,9 +84,9 @@ class SectionProducer:
         """
         from litellm import cost_per_token, token_counter
 
-        # Extract data from PDFs
-        presentation_data = self._extract_pdf(presentation_path, "presentation")
-        transcript_data = self._extract_pdf(transcript_path, "transcript")
+        # Extract data from documents (PDF or TXT)
+        presentation_data = self._extract_document(presentation_path, "presentation")
+        transcript_data = self._extract_document(transcript_path, "transcript")
 
         # Count slides
         slide_count = len(presentation_data.split("\n\n"))
@@ -227,11 +237,11 @@ class SectionProducer:
     ) -> list[Section]:
         if callback:
             callback("Extracting presentation data...")
-        presentation_data = self._extract_pdf(presentation_path, "presentation")
+        presentation_data = self._extract_document(presentation_path, "presentation")
 
         if callback:
             callback("Extracting transcript data...")
-        transcript_data = self._extract_pdf(transcript_path, "transcript")
+        transcript_data = self._extract_document(transcript_path, "transcript")
 
         if callback:
             callback("Calling LLM...")

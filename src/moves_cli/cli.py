@@ -69,30 +69,35 @@ settings_app = typer.Typer(help="Configure system settings (model, API key)")
 @speaker_app.command("add")
 def speaker_add(
     name: str = typer.Argument(..., help="Speaker's name"),
-    source_presentation: Path = typer.Argument(..., help="Path to presentation file"),
-    source_transcript: Path = typer.Argument(..., help="Path to transcript file"),
+    source_presentation: str = typer.Argument(
+        ..., help="Path or Google URL to presentation file"
+    ),
+    source_transcript: str = typer.Argument(
+        ..., help="Path or Google URL to transcript file"
+    ),
 ):
     """Create a new speaker profile with presentation and transcript files"""
-    # Validate file paths exist
-    if not source_presentation.exists() or not source_transcript.exists():
-        missing = {}
-        if not source_presentation.exists():
-            missing["Presentation"] = f"Not found: {source_presentation}"
-        if not source_transcript.exists():
-            missing["Transcript"] = f"Not found: {source_transcript}"
-        typer.echo(output(f"Could not add speaker '{name}'.", missing), err=True)
-        raise typer.Exit(1)
+    from moves_cli.utils.google_handler import resolve_source_path
 
     try:
+        # Resolve sources (download if URL, validate if local path)
+        presentation_path = resolve_source_path(source_presentation)
+        transcript_path = resolve_source_path(source_transcript)
+
         # Add speaker
         speaker_manager = speaker_manager_instance()
-        speaker = speaker_manager.add(name, source_presentation, source_transcript)
+        speaker = speaker_manager.add(name, presentation_path, transcript_path)
 
         # Display success message
         typer.echo(output(f"Speaker {speaker.label} has been successfully added."))
 
     except typer.Exit:
         raise
+    except (ValueError, FileNotFoundError, RuntimeError) as e:
+        typer.echo(
+            output(f"Could not add speaker '{name}'.", {"Error": str(e)}), err=True
+        )
+        raise typer.Exit(1)
     except Exception as e:
         typer.echo(
             output(f"Could not add speaker '{name}'.", {"Error": str(e)}), err=True
@@ -104,13 +109,15 @@ def speaker_add(
 def speaker_edit(
     speaker: str = typer.Argument(..., help="Speaker name or ID"),
     source_presentation: Optional[str] = typer.Option(
-        None, "--presentation", "-p", help="New presentation file path"
+        None, "--presentation", "-p", help="New presentation file path or Google URL"
     ),
     source_transcript: Optional[str] = typer.Option(
-        None, "--transcript", "-t", help="New transcript file path"
+        None, "--transcript", "-t", help="New transcript file path or Google URL"
     ),
 ):
     """Update speaker's presentation and/or transcript files"""
+    from moves_cli.utils.google_handler import resolve_source_path
+
     # Validate at least one parameter is provided
     if not source_presentation and not source_transcript:
         typer.echo(
@@ -126,29 +133,14 @@ def speaker_edit(
         speaker_manager = speaker_manager_instance()
         resolved_speaker = speaker_manager.resolve(speaker)
 
-        # Validate and convert paths
-        presentation_path = Path(source_presentation) if source_presentation else None
-        transcript_path = Path(source_transcript) if source_transcript else None
+        # Resolve sources (download if URL, validate if local path)
+        presentation_path = None
+        transcript_path = None
 
-        if presentation_path and not presentation_path.exists():
-            typer.echo(
-                output(
-                    f"Could not update speaker {resolved_speaker.label}.",
-                    {"Presentation": f"Not found: {presentation_path}"},
-                ),
-                err=True,
-            )
-            raise typer.Exit(1)
-
-        if transcript_path and not transcript_path.exists():
-            typer.echo(
-                output(
-                    f"Could not update speaker {resolved_speaker.label}.",
-                    {"Transcript": f"Not found: {transcript_path}"},
-                ),
-                err=True,
-            )
-            raise typer.Exit(1)
+        if source_presentation:
+            presentation_path = resolve_source_path(source_presentation)
+        if source_transcript:
+            transcript_path = resolve_source_path(source_transcript)
 
         # Update speaker
         updated_speaker = speaker_manager.edit(
@@ -170,6 +162,9 @@ def speaker_edit(
 
     except typer.Exit:
         raise
+    except (ValueError, FileNotFoundError, RuntimeError) as e:
+        typer.echo(output(f"Error: {str(e)}"), err=True)
+        raise typer.Exit(1)
     except Exception as e:
         typer.echo(output(f"Error: {str(e)}"), err=True)
         raise typer.Exit(1)
