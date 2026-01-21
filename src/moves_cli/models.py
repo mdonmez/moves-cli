@@ -95,7 +95,7 @@ EmbeddingModel = MlModel(
     name="sentence-transformers/all-MiniLM-l6-v2",
     base_url="https://github.com/mdonmez/moves-cli/raw/refs/heads/master/src/moves_cli/data/ml_models/all-MiniLM-L6-v2_quint8_avx2",
     files={
-        "model.onnx": "e0def985059c9db8",  # xxh3_64 hash
+        "model.onnx": "cda38b71e6003d03",  # xxh3_64 hash
         "config.json": "ef5a8e793fd9b2f9",  # xxhash because blazingly fast and they're calculated everytime when control starts
         "special_tokens_map.json": "93a083cd86fe86e1",  # also in future xxhash will be used for presentation, transcript and sections files.
         "tokenizer.json": "9a86f184b2242391",
@@ -104,7 +104,7 @@ EmbeddingModel = MlModel(
     model_dir=DATA_FOLDER / "ml_models" / "all-MiniLM-L6-v2_quint8_avx2",
 )
 
-# NEMO MODEL 480 MS ITS NEARLY 
+# NEMO MODEL 480 MS ITS NEARLY
 SttModel = MlModel(
     name="sherpa-onnx-nemo-streaming-fast-conformer-transducer-en-480ms",
     base_url="https://github.com/mdonmez/moves-cli/raw/refs/heads/master/src/moves_cli/data/ml_models/nemo-streaming-stt-480ms-int8",

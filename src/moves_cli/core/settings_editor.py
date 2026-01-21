@@ -3,7 +3,7 @@ from typing import Any
 import keyring
 import tomlkit
 
-from moves_cli.config import DEFAULT_API_KEY, DEFAULT_LLM_MODEL
+from moves_cli.config import DEFAULT_LLM_MODEL
 from moves_cli.models import Settings
 from moves_cli.utils.data_handler import DataHandler
 
@@ -25,18 +25,6 @@ class SettingsEditor:
             user_data = dict(tomlkit.parse(self.data_handler.read(self.settings)))
         except Exception:
             user_data = {}
-
-        # Migrate plaintext API key from settings.toml to keyring
-        if "key" in user_data and user_data["key"]:
-            try:
-                keyring.set_password(
-                    KEYRING_SERVICE, KEYRING_USERNAME, user_data["key"]
-                )
-                # Remove from settings.toml after successful migration
-                del user_data["key"]
-            except keyring.errors.PasswordSetError:
-                # Migration failed, keep in plaintext (fallback)
-                pass
 
         self._data = {**self._template_defaults, **user_data}
 
