@@ -1,4 +1,5 @@
 import asyncio
+import getpass
 from pathlib import Path
 from typing import Optional
 
@@ -89,7 +90,17 @@ def speaker_add(
         speaker = speaker_manager.add(name, presentation_path, transcript_path)
 
         # Display success message
-        typer.echo(output(f"Speaker {speaker.label} has been successfully added."))
+        speaker_dir = speaker_manager.SPEAKERS_PATH / speaker.speaker_id
+        typer.echo(
+            output(
+                f"Speaker {speaker.label} has been successfully added.",
+                {
+                    "Data directory": speaker_dir,
+                    "Presentation source": speaker.source_presentation,
+                    "Transcript source": speaker.source_transcript,
+                },
+            )
+        )
 
     except typer.Exit:
         raise
@@ -148,7 +159,8 @@ def speaker_edit(
         )
 
         # Display updated speaker information
-        updates = {}
+        speaker_dir = speaker_manager.SPEAKERS_PATH / updated_speaker.speaker_id
+        updates = {"Data directory": speaker_dir}
         if presentation_path:
             updates["New presentation source"] = updated_speaker.source_presentation
         if transcript_path:
@@ -179,7 +191,13 @@ def speaker_list():
         speakers = speaker_manager.list()
 
         if not speakers:
-            typer.echo(output("No speakers are registered."))
+            speakers_dir = speaker_manager.SPEAKERS_PATH
+            typer.echo(
+                output(
+                    "No speakers are registered.",
+                    {"Data directory": speakers_dir},
+                )
+            )
             return
 
         # Build table rows
@@ -197,7 +215,15 @@ def speaker_list():
                 }
             )
 
-        typer.echo(output(f"There are {len(speakers)} registered speaker(s).", rows))
+        speakers_dir = speaker_manager.SPEAKERS_PATH
+        typer.echo(
+            output(
+                f"There are {len(speakers)} registered speaker(s).",
+                rows,
+            )
+        )
+        typer.echo()
+        typer.echo(output(f"Data directory: {speakers_dir}"))
 
     except typer.Exit:
         raise
@@ -218,6 +244,7 @@ def speaker_show(
 
         status = "Ready" if resolved_speaker.sections_file.exists() else "Not Ready"
         last_processed_str = format_datetime(resolved_speaker.last_processed)
+        speaker_dir = speaker_manager.SPEAKERS_PATH / resolved_speaker.speaker_id
 
         typer.echo(
             output(
@@ -227,8 +254,10 @@ def speaker_show(
                     "ID": resolved_speaker.speaker_id,
                     "Status": status,
                     "Last Processed": last_processed_str,
-                    "Presentation": resolved_speaker.source_presentation,
-                    "Transcript": resolved_speaker.source_transcript,
+                    "Data directory": speaker_dir,
+                    "Sections file": resolved_speaker.sections_file,
+                    "Presentation source": resolved_speaker.source_presentation,
+                    "Transcript source": resolved_speaker.source_transcript,
                 },
             )
         )
@@ -283,7 +312,7 @@ def speaker_prepare(
             if not settings.key:
                 typer.echo(
                     output(
-                        "Error: LLM API key not configured. Use 'moves settings set key <key>' to configure."
+                        "Error: LLM API key not configured. Use 'moves settings set key' to configure."
                     ),
                     err=True,
                 )
@@ -336,20 +365,30 @@ def speaker_prepare(
         if len(resolved_speakers) == 1:
             result = results[0]
             speaker = resolved_speakers[0]
-            typer.echo(output(f"Speaker {speaker.label} prepared."))
-            typer.echo()
+            speaker_dir = speaker_manager.SPEAKERS_PATH / speaker.speaker_id
+
             if manual:
                 typer.echo(
                     output(
-                        f"{result.section_count} empty sections created. Edit sections.md to add speech content."
+                        f"Speaker {speaker.label} prepared.",
+                        {
+                            "Sections created": result.section_count,
+                            "Sections file": speaker.sections_file,
+                            "Data directory": speaker_dir,
+                            "Next step": "Edit sections.md to add speech content for each slide",
+                        },
                     )
                 )
-                typer.echo()
-                typer.echo(output(f"File: {speaker.sections_file}"))
             else:
                 typer.echo(
                     output(
-                        f"{result.section_count} sections have been created in {result.processing_time_seconds:.1f} seconds."
+                        f"Speaker {speaker.label} prepared.",
+                        {
+                            "Sections created": result.section_count,
+                            "Processing time": f"{result.processing_time_seconds:.1f}s",
+                            "Sections file": speaker.sections_file,
+                            "Data directory": speaker_dir,
+                        },
                     )
                 )
         else:
@@ -447,9 +486,15 @@ def speaker_delete(
 
         for speaker in resolved_speakers:
             try:
+                speaker_dir = speaker_manager.SPEAKERS_PATH / speaker.speaker_id
                 speaker_manager.delete(speaker)
                 if yes:
-                    typer.echo(output(f"Speaker {speaker.label} deleted."))
+                    typer.echo(
+                        output(
+                            f"Speaker {speaker.label} deleted.",
+                            {"Data directory removed": speaker_dir},
+                        )
+                    )
                 deleted_count += 1
             except Exception as e:
                 typer.echo(
@@ -672,10 +717,16 @@ def settings_list(
         else:
             display_key = "Not configured"
 
+        settings_file = settings_editor.data_handler.DATA_FOLDER / "settings.toml"
         typer.echo(
             output(
-                f"moves settings (see: {settings_editor.data_handler.DATA_FOLDER / 'settings.toml'})",
-                {"model (LLM Model)": model_value, "key (API Key)": display_key},
+                "moves CLI Configuration",
+                {
+                    "Configuration file": settings_file,
+                    "model (LLM Model)": model_value,
+                    "key (API Key)": display_key,
+                    "Note": "API keys are stored in Windows Credential Manager (keyring)",
+                },
             )
         )
 
@@ -688,8 +739,8 @@ def settings_list(
 
 @settings_app.command("set")
 def settings_set(
-    key: str = typer.Argument(..., help="Setting name to update"),
-    value: str = typer.Argument(..., help="New setting value"),
+    key: str = typer.Argument(..., help="Setting name to update: 'model' or 'key'"),
+    value: str | None = typer.Argument(None, help="Setting value (only for 'model')"),
 ):
     """Configure system settings: model (LLM model name) or key (API key)"""
     try:
@@ -704,11 +755,65 @@ def settings_set(
             typer.echo(output(f"Valid keys: {', '.join(valid_keys)}"), err=True)
             raise typer.Exit(1)
 
+        # Handle API key with interactive masked input only
+        if key == "key":
+            if value is not None:
+                typer.echo(
+                    output(
+                        "Error: API key cannot be passed as argument for security reasons."
+                    ),
+                    err=True,
+                )
+                typer.echo(
+                    output(
+                        "Usage: moves settings set key (interactive prompt will appear)"
+                    ),
+                    err=True,
+                )
+                raise typer.Exit(1)
+
+            # Interactive masked input
+            import sys
+
+            typer.echo("Note: Your input will not be shown on screen.", err=True)
+            value = getpass.getpass("Enter API key: ", stream=sys.stderr)
+            if not value or not value.strip():
+                typer.echo(output("Error: API key cannot be empty."), err=True)
+                raise typer.Exit(1)
+            value = value.strip()
+
+        # Check if value is provided for model setting
+        if key == "model" and value is None:
+            typer.echo(
+                output("Error: value argument is required for 'model' setting"),
+                err=True,
+            )
+            typer.echo(output("Usage: moves settings set model <model-name>"), err=True)
+            raise typer.Exit(1)
+
         # Update setting
         success = settings_editor.set(key, value)
 
         if success:
-            typer.echo(output(f"Setting '{key}' updated.", {"New Value": value}))
+            if key == "key":
+                display_value = (
+                    f"{value[:4]}{'*' * (len(value) - 8)}{value[-4:]}"
+                    if len(value) > 8
+                    else ("*" * len(value))
+                )
+                storage_location = "Windows Credential Manager"
+            else:
+                display_value = value
+                storage_location = str(
+                    settings_editor.data_handler.DATA_FOLDER / "settings.toml"
+                )
+
+            typer.echo(
+                output(
+                    f"Setting '{key}' updated.",
+                    {"New value": display_value, "Storage": storage_location},
+                )
+            )
         else:
             typer.echo(output(f"Could not update setting '{key}'."), err=True)
             raise typer.Exit(1)
@@ -752,9 +857,16 @@ def settings_unset(
                 )
             else:
                 display_value = "Not configured"
+
+            storage_location = (
+                "Windows Credential Manager"
+                if key == "key"
+                else (settings_editor.data_handler.DATA_FOLDER / "settings.toml")
+            )
             typer.echo(
                 output(
-                    f"Setting '{key}' reset to default.", {"New Value": display_value}
+                    f"Setting '{key}' reset to default.",
+                    {"New Value": display_value, "Removed from": storage_location},
                 )
             )
         else:

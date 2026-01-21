@@ -13,6 +13,7 @@ dependencies = [
     "httpx>=0.28.1",
     "instructor[litellm]>=1.14.3",
     "jellyfish>=1.2.1",
+    "keyring>=25.0.0",
     "litellm>=1.80.16",
     "mistune>=3.2.0",
     "num2words>=0.5.14",

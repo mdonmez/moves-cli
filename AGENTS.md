@@ -184,17 +184,61 @@ src/moves_cli/
 └── data/                 # ML models (at build time)
 ```
 
+### Security Considerations
+
+#### API Key Storage
+
+- **DO NOT** store API keys in plaintext or commit them to version control
+- API keys are stored securely using `keyring` library (OS-native credential manager)
+- On Windows: Windows Credential Manager
+- On macOS: Keychain
+- On Linux: Secret Service API
+
+**Keyring Configuration:**
+```python
+# settings_editor.py
+KEYRING_SERVICE = "moves-cli"
+KEYRING_USERNAME = "api-key"
+
+# Store key
+keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, api_key)
+
+# Retrieve key
+api_key = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
+
+# Delete key
+keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
+```
+
+**CLI Security:**
+- `moves settings set key` uses `getpass.getpass()` for masked input
+- Argument-based API key passing shows security warning
+- `settings list` masks keys by default (first 4 + last 4 chars visible)
+- Use `--show` flag to display full key when needed
+
+**Migration:**
+- Existing plaintext keys in `settings.toml` auto-migrate to keyring on first load
+- After migration, keys are removed from `settings.toml`
+- Only `model` setting remains in TOML file
+
+#### Windows Credential Manager Check
+
+```powershell
+# List all credentials
+cmdkey /list
+
+# Check for moves-cli entry
+cmdkey /list | Select-String -Pattern "moves-cli"
+
+# Delete credential (if needed)
+cmdkey /delete:LegacyGeneric:target=moves-cli
+```
+
 ### Critical Paths (Don't Modify Without Testing)
 
 - `models.py:94-131` - ML model configurations with hardcoded hashes
 - `cli.py:1-100` - CLI command structure
 - `core/presentation_controller.py` - Audio processing and navigation logic
 - `core/speaker_manager.py` - Speaker lifecycle management
-- `utils/text_normalizer.py` - Speech normalization pipeline
-
-### Performance Considerations
-
-- Text normalization has two modes: `LIVE` (skip num2words) and `PREPROCESS`
-- Use xxhash for fast file hashing
-- Sliding window buffer limits memory: `self._word_buffer[-window_size:]`
+- `core/settings_editor.py` - Keyring integration and API key management
 - VAD gating prevents unnecessary STT processing

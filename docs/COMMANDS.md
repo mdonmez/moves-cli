@@ -1072,51 +1072,84 @@ moves settings list [--show]
 **Parametreler:**
 - `--show`, `-s`: API key'i tam olarak göster
 
+**Güvenlik:**
+- API key'ler Windows Credential Manager'dan okunur (keyring)
+- Varsayılan olarak maskelenir, `--show` ile tam gösterilir
+
 **Detaylı Çalışma Akışı:**
 
 #### Adım 1: Settings Okuma
 ```python
-# cli.py:662-665
+# cli.py
 settings_editor = settings_editor_instance()
 settings = settings_editor.list()
 ```
 
 **SettingsEditor.list() Akışı:**
 ```python
-# settings_editor.py:83-87
+# settings_editor.py
 def list(self) -> Settings:
+    # Get API key from keyring (OS-native secure storage)
+    api_key = None
+    try:
+        api_key = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
+    except Exception:
+        # Keyring access failed, key doesn't exist
+        pass
+    
     return Settings(
         model=self._data.get("model") or None,
-        key=self._data.get("key") or None,
+        key=api_key,
     )
 ```
 
 #### Adım 2: Key Maskeleme
 ```python
-# cli.py:670-76
+# cli.py
 if settings.key:
     display_key = settings.key
     if not show:
         if len(settings.key) > 8:
+            # Show first 4 and last 4 chars, mask the middle
             display_key = f"{settings.key[:4]}{'*' * (len(settings.key) - 8)}{settings.key[-4:]}"
         else:
+            # Mask entire key if shorter than 8 chars
             display_key = "*" * len(settings.key)
+else:
+    display_key = "Not configured"
 ```
 
 #### Adım 3: Görüntüleme
 ```python
-# cli.py:680-685
+# cli.py
+settings_file = settings_editor.data_handler.DATA_FOLDER / "settings.toml"
 typer.echo(output(
-    f"moves settings (see: {settings_editor.data_handler.DATA_FOLDER / 'settings.toml'})",
-    {"model (LLM Model)": model_value, "key (API Key)": display_key},
+    "moves CLI Configuration",
+    {
+        "Configuration file": settings_file,
+        "model (LLM Model)": model_value,
+        "key (API Key)": display_key,
+        "Note": "API keys are stored in Windows Credential Manager (keyring)",
+    },
 ))
 ```
 
-**Örnek Çıktı:**
+**Örnek Çıktı (Masked):**
 ```
-moves settings (see: C:\Users\user\.moves\settings.toml)
-  model (LLM Model): gemini/gemini-2.5-flash-lite
-  key (API Key):     abcd****1234
+moves CLI Configuration
+  Configuration file:  C:\Users\user\.moves\settings.toml
+  model (LLM Model):   gemini/gemini-2.5-flash-lite
+  key (API Key):       AIza*******************************7RlM
+  Note:                API keys are stored in Windows Credential Manager (keyring)
+```
+
+**Örnek Çıktı (--show ile):**
+```
+moves CLI Configuration
+  Configuration file:  C:\Users\user\.moves\settings.toml
+  model (LLM Model):   gemini/gemini-2.5-flash-lite
+  key (API Key):       AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxx7RlM
+  Note:                API keys are stored in Windows Credential Manager (keyring)
 ```
 
 ---
@@ -1127,77 +1160,138 @@ moves settings (see: C:\Users\user\.moves\settings.toml)
 
 **Kullanım:**
 ```bash
-moves settings set <key> <value>
+# Model configuration (value as argument)
+moves settings set model <model-name>
+
+# API key configuration (interactive masked input only)
+moves settings set key
 ```
 
 **Parametreler:**
 - `key`: Ayar adı (zorunlu) - `model` veya `key`
-- `value`: Yeni değer (zorunlu)
+- `value`: Yeni değer (yalnızca `model` için gerekli, `key` için kullanılmaz)
+
+**Güvenlik:**
+- API key'ler sadece interaktif masked input ile girilebilir
+- Argument olarak API key geçilemez - güvenlik hatası verir
+- API key'ler Windows Credential Manager'da keyring ile güvenli saklanır
 
 **Detaylı Çalışma Akışı:**
 
 #### Adım 1: Key Doğrulama
 ```python
-# cli.py:704-710
+# cli.py
 valid_keys = ["model", "key"]
 if key not in valid_keys:
     raise typer.Exit(1)
 ```
 
-#### Adım 2: Ayar Güncelleme
+#### Adım 2: API Key için Security Check
 ```python
-# cli.py:712-719
+# cli.py
+if key == "key":
+    if value is not None:
+        # Error: API key cannot be passed as argument
+        typer.echo(output("Error: API key cannot be passed as argument for security reasons."), err=True)
+        raise typer.Exit(1)
+    
+    # Interactive masked input with stderr stream
+    import sys
+    value = getpass.getpass("Enter API key: ", stream=sys.stderr)
+    if not value or not value.strip():
+        typer.echo(output("Error: API key cannot be empty."), err=True)
+        raise typer.Exit(1)
+    value = value.strip()
+```
+
+#### Adım 3: Model Value Check
+```python
+# cli.py
+if key == "model" and value is None:
+    typer.echo(output("Error: value argument is required for 'model' setting"), err=True)
+    raise typer.Exit(1)
+```
+
+#### Adım 4: Ayar Güncelleme
+```python
+# cli.py
 success = settings_editor.set(key, value)
 if success:
-    typer.echo(output(f"Setting '{key}' updated.", {"New Value": value}))
-else:
-    raise typer.Exit(1)
+    if key == "key":
+        display_value = f"{value[:4]}{'*' * (len(value) - 8)}{value[-4:]}" if len(value) > 8 else ("*" * len(value))
+        storage_location = "Windows Credential Manager"
+    else:
+        display_value = value
+        storage_location = str(settings_file)
+    
+    typer.echo(output(
+        f"Setting '{key}' updated.",
+        {"New value": display_value, "Storage": storage_location}
+    ))
 ```
 
 **SettingsEditor.set() Akışı:**
 ```python
-# settings_editor.py:60-69
+# settings_editor.py
 def set(self, key: str, value: Any) -> bool:
-    if key not in self._template_defaults:
+    if key == "key":
+        # Store API key in keyring (OS-native secure storage)
+        try:
+            keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, value)
+            return True
+        except keyring.errors.PasswordSetError as e:
+            raise RuntimeError(f"Failed to store API key in keyring: {e}") from e
+    elif key in self._template_defaults:
+        # Store other settings in toml file
+        self._data[key] = value
+        self._save()
+        return True
+    else:
         return False
-    
-    self._data[key] = value
-    self._save()
-    return True
 ```
 
-**SettingsEditor._save() Akışı:**
+**Keyring Constants:**
 ```python
-# settings_editor.py:30-58
-def _save(self) -> bool:
-    self.settings.parent.mkdir(parents=True, exist_ok=True)
-    
-    doc = tomlkit.document()
-    doc.add(tomlkit.comment("moves CLI Configuration"))
-    
-    for key in self._template_defaults.keys():
-        if key == "model":
-            doc.add(tomlkit.comment("LLM model for speaker processing..."))
-        elif key == "key":
-            doc.add(tomlkit.comment("API key for the LLM provider"))
-        
-        value = self._data.get(key)
-        doc[key] = value if value is not None else ""
-    
-    with self.settings.open("w", encoding="utf-8") as f:
-        f.write(tomlkit.dumps(doc))
-    return True
+# settings_editor.py
+KEYRING_SERVICE = "moves-cli"
+KEYRING_USERNAME = "api-key"
 ```
 
-**Settings TOML Formatı:**
+**Settings TOML Formatı (API key artık burada saklanmaz):**
 ```toml
 # moves CLI Configuration
 
+# Note: API key is stored securely in system keyring
+
 # LLM model for speaker processing, find models at: https://models.litellm.ai/
 model = "gemini/gemini-2.5-flash-lite"
+```
 
-# API key for the LLM provider
-key = "your-api-key-here"
+**Windows Credential Manager'da Saklama:**
+- Service Name: `moves-cli`
+- Username: `api-key`
+- Password: Kullanıcının API key'i
+- PowerShell ile kontrol: `cmdkey /list | Select-String -Pattern "moves-cli"`
+
+**Örnek Kullanım:**
+```bash
+# Model ayarla (argument ile)
+moves settings set model gemini/gemini-2.5-flash-lite
+# Setting 'model' updated.
+#   New value: gemini/gemini-2.5-flash-lite
+#   Storage:   C:\Users\user\.moves\settings.toml
+
+# API key ayarla (interaktif)
+moves settings set key
+# Enter API key: [masked input]
+# Setting 'key' updated.
+#   New value: AIza*******************************7RlM
+#   Storage:   Windows Credential Manager
+
+# HATALI: Argument ile API key
+moves settings set key AIzaSy...
+# Error: API key cannot be passed as argument for security reasons.
+# Usage: moves settings set key (interactive prompt will appear)
 ```
 
 ---
@@ -1214,11 +1308,15 @@ moves settings unset <key>
 **Parametreler:**
 - `key`: Ayar adı (zorunlu) - `model` veya `key`
 
+**Güvenlik:**
+- API key'ler Windows Credential Manager'dan silinir (keyring)
+- Model settings.toml'den silinip varsayılana döner
+
 **Detaylı Çalışma Akışı:**
 
 #### Adım 1: Key Doğrulama
 ```python
-# cli.py:739-744
+# cli.py
 valid_keys = ["model", "key"]
 if key not in valid_keys:
     raise typer.Exit(1)
@@ -1226,28 +1324,49 @@ if key not in valid_keys:
 
 #### Adım 2: Varsayılan Değeri Alma
 ```python
-# cli.py:746-747
+# cli.py
 template_value = settings_editor._template_defaults.get(key)
 # model: "gemini/gemini-2.5-flash-lite"
-# key: ""
+# key: None (keyring'den silinir)
 ```
 
 #### Adım 3: Sıfırlama
 ```python
-# cli.py:749-764
+# cli.py
 success = settings_editor.unset(key)
 if success:
     display_value = "Not configured" if template_value is None else str(template_value)
+    storage_location = "Windows Credential Manager" if key == "key" else settings_file
     typer.echo(output(
         f"Setting '{key}' reset to default.",
-        {"New Value": display_value}
+        {"New Value": display_value, "Removed from": storage_location}
     ))
 ```
 
 **SettingsEditor.unset() Akışı:**
 ```python
-# settings_editor.py:71-81
+# settings_editor.py
 def unset(self, key: str) -> bool:
+    if key == "key":
+        # Delete API key from keyring
+        try:
+            keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
+            return True
+        except keyring.errors.PasswordDeleteError:
+            # Key doesn't exist, that's fine
+            return True
+        except Exception as e:
+            raise RuntimeError(f"Failed to delete API key from keyring: {e}") from e
+    elif key in self._template_defaults:
+        # Reset other settings to default
+        self._data[key] = self._template_defaults[key]
+        self._save()
+        return True
+    else:
+        self._data.pop(key, None)
+        self._save()
+        return True
+```
     if key in self._template_defaults:
         self._data[key] = self._template_defaults[key]
     else:
