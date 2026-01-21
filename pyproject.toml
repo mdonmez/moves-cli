@@ -38,7 +38,7 @@ Homepage = "https://github.com/mdonmez/moves-cli"
 Documentation = "https://github.com/mdonmez/moves-cli/tree/master/docs"
 
 [project.scripts]
-moves-cli = "moves_cli.cli:app"
+moves = "moves_cli.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]
