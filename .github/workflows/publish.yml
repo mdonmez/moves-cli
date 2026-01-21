@@ -2,6 +2,11 @@ name: Publish to PyPI
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: true
+        type: string
 
 jobs:
   publish:
@@ -12,6 +17,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+      
       - uses: astral-sh/setup-uv@v7
+      
+      - name: Update version in pyproject.toml
+        run: |
+          uv version ${{ github.event.inputs.version }}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
+          git push
+      
       - run: uv build
+      
       - uses: pypa/gh-action-pypi-publish@release/v1
