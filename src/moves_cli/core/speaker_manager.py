@@ -89,10 +89,13 @@ class SpeakerManager:
         for k, v in data.items():
             if isinstance(v, str) and ("/" in v or "\\" in v):
                 # Don't convert URLs to Path objects - check if string has a URL scheme
+                # urlparse is very forgiving and won't raise exceptions, but we catch
+                # any unexpected errors to be safe
                 try:
                     parsed = urlparse(v)
                     is_url = bool(parsed.scheme and parsed.netloc)
-                except Exception:
+                except (ValueError, AttributeError):
+                    # In case of unexpected urlparse behavior
                     is_url = False
                 
                 if not is_url:
