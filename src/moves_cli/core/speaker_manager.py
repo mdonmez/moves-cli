@@ -84,10 +84,12 @@ class SpeakerManager:
         yaml = YAML()
         data = yaml.load(StringIO(self.data_handler.read(path)))
 
-        # Path string'lerini Path objesine dönüştür
+        # Path string'lerini Path objesine dönüştür (but not URLs)
         for k, v in data.items():
             if isinstance(v, str) and ("/" in v or "\\" in v):
-                data[k] = Path(v)
+                # Don't convert URLs to Path objects
+                if not v.startswith("http://") and not v.startswith("https://"):
+                    data[k] = Path(v)
 
         return Speaker(**data)
 
