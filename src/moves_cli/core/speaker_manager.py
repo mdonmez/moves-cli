@@ -80,6 +80,7 @@ class SpeakerManager:
 
     def _read_speaker_yaml(self, path: Path) -> Speaker:
         from ruamel.yaml import YAML
+        from urllib.parse import urlparse
 
         yaml = YAML()
         data = yaml.load(StringIO(self.data_handler.read(path)))
@@ -87,8 +88,14 @@ class SpeakerManager:
         # Path string'lerini Path objesine dönüştür (but not URLs)
         for k, v in data.items():
             if isinstance(v, str) and ("/" in v or "\\" in v):
-                # Don't convert URLs to Path objects
-                if not v.startswith("http://") and not v.startswith("https://"):
+                # Don't convert URLs to Path objects - check if string has a URL scheme
+                try:
+                    parsed = urlparse(v)
+                    is_url = bool(parsed.scheme and parsed.netloc)
+                except Exception:
+                    is_url = False
+                
+                if not is_url:
                     data[k] = Path(v)
 
         return Speaker(**data)
