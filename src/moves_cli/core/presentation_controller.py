@@ -20,7 +20,15 @@ from rich.text import Text
 from rich.theme import Theme
 from sherpa_onnx import OnlineRecognizer, VadModelConfig, VoiceActivityDetector
 
-from moves_cli.config import SIMILARITY_THRESHOLD, WINDOW_SIZE
+from moves_cli.config import (
+    SIMILARITY_THRESHOLD,
+    VAD_BUFFER_SIZE,
+    VAD_MIN_SILENCE,
+    VAD_MIN_SPEECH,
+    VAD_THRESHOLD,
+    VAD_WINDOW_SIZE,
+    WINDOW_SIZE,
+)
 from moves_cli.core.components import chunk_producer
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.models import Section, SttModel, VadModel
@@ -179,12 +187,12 @@ class PresentationController:
     SHUTDOWN_CHECK_INTERVAL: float = 0.5
     MODEL_DIR: Path = SttModel.model_dir
     VAD_MODEL_DIR: Path = VadModel.model_dir
-    # VAD configuration (tuned for office/home environments)
-    VAD_THRESHOLD: float = 0.35  # Lower = more sensitive to speech
-    VAD_MIN_SILENCE: float = 0.5  # Seconds of silence to end speech segment
-    VAD_MIN_SPEECH: float = 0.1  # Minimum speech duration to detect
-    VAD_WINDOW_SIZE: int = 512  # ~32ms analysis window at 16kHz
-    VAD_BUFFER_SIZE: float = 30.0  # Circular buffer size in seconds
+    # VAD configuration loaded from config.py
+    VAD_THRESHOLD: float = VAD_THRESHOLD
+    VAD_MIN_SILENCE: float = VAD_MIN_SILENCE
+    VAD_MIN_SPEECH: float = VAD_MIN_SPEECH
+    VAD_WINDOW_SIZE: int = VAD_WINDOW_SIZE
+    VAD_BUFFER_SIZE: float = VAD_BUFFER_SIZE
     # from config.py
     SIMILARITY_THRESHOLD: float = SIMILARITY_THRESHOLD
     WINDOW_SIZE: int = WINDOW_SIZE

@@ -24,3 +24,10 @@ CANDIDATE_RANGE_MAX_OFFSET: int = 5
 # Default settings (used by SettingsEditor)
 DEFAULT_LLM_MODEL: str = "gemini/gemini-2.5-flash-lite"  # gemini, nearly everyone have google account and gemini api is free
 DEFAULT_API_KEY: str = ""
+
+# VAD configuration (tuned for office/home environments, adjust for large venues)
+VAD_THRESHOLD: float = 0.35  # Lower = more sensitive to speech (0.1-0.9)
+VAD_MIN_SILENCE: float = 0.5  # Seconds of silence to end speech segment
+VAD_MIN_SPEECH: float = 0.1  # Minimum speech duration to detect
+VAD_WINDOW_SIZE: int = 512  # ~32ms analysis window at 16kHz
+VAD_BUFFER_SIZE: float = 30.0  # Circular buffer size in seconds
