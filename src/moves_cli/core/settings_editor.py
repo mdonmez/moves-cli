@@ -10,7 +10,6 @@ from moves_cli.utils.data_handler import DataHandler
 class SettingsEditor:
     def __init__(self, data_handler: DataHandler):
         self.data_handler = data_handler
-        # im using toml in here because it is better than yaml and json for this use case
         self.settings = self.data_handler.DATA_FOLDER / "settings.toml"
 
         self._template_defaults: dict[str, Any] = {
@@ -28,7 +27,6 @@ class SettingsEditor:
         self._save()
 
     def _save(self) -> bool:
-        # this is self-healing config saver
         try:
             self.settings.parent.mkdir(parents=True, exist_ok=True)
 
@@ -39,14 +37,15 @@ class SettingsEditor:
             doc.add(tomlkit.nl())
 
             for key in self._template_defaults.keys():
-                if key == "model":
-                    doc.add(
-                        tomlkit.comment(
-                            "LLM model for speaker processing, find models at: https://models.litellm.ai/"
+                match key:
+                    case "model":
+                        doc.add(
+                            tomlkit.comment(
+                                "LLM model for speaker processing, find models at: https://models.litellm.ai/"
+                            )
                         )
-                    )
-                elif key == "key":
-                    doc.add(tomlkit.comment("API key for the LLM provider"))
+                    case "key":
+                        doc.add(tomlkit.comment("API key for the LLM provider"))
 
                 value = self._data.get(key)
                 doc[key] = value if value is not None else ""
