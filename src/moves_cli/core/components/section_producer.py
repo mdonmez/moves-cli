@@ -1,51 +1,176 @@
 from importlib.resources import files
 from pathlib import Path
 from typing import Callable, Literal
+import contextlib
+import io
 
 import instructor
-import pymupdf
+
+# Suppress pymupdf4llm import warning about layout package
+with contextlib.redirect_stdout(io.StringIO()):
+    import pymupdf4llm
+from docx import Document
 from litellm import completion
+from pptx import Presentation
 from pydantic import BaseModel, Field
 
 from moves_cli.models import Section
 
 
 class SectionProducer:
+    def _extract_pdf(
+        self, file_path: Path, extraction_type: Literal["transcript", "presentation"]
+    ) -> str:
+        """Extract text from PDF using PyMuPDF4LLM (optimized for LLM processing).
+
+        Uses markdown conversion which preserves structure better than plain text.
+        """
+        # PyMuPDF4LLM works with file path (str)
+        # Using page_chunks for better structure preservation
+        chunks = pymupdf4llm.to_markdown(
+            str(file_path),
+            page_chunks=True,  # Returns list of dicts, one per page
+        )
+
+        match extraction_type:
+            case "transcript":
+                # Extract all text from all pages, concatenate into one line
+                full_text = " ".join(chunk["text"] for chunk in chunks)  # type: ignore
+                # Remove extra spaces and newlines for transcript
+                result = " ".join(full_text.split())
+                return result
+
+            case "presentation":
+                # For page-by-page presentation, keep markdown structure
+                markdown_sections = []
+                for i, chunk in enumerate(chunks):
+                    # Clean up markdown text but preserve basic structure
+                    page_text = chunk["text"].strip()  # type: ignore
+                    cleaned_text = " ".join(page_text.split())
+                    markdown_sections.append(f"# Slide Page {i + 1}\n{cleaned_text}")
+
+                return "\n\n".join(markdown_sections)
+
+    def _extract_docx(
+        self, file_path: Path, extraction_type: Literal["transcript", "presentation"]
+    ) -> str:
+        """Extract text from DOCX using python-docx (free, no PyMuPDF Pro needed)."""
+        # Read document (python-docx accepts str path)
+        doc = Document(str(file_path))
+
+        match extraction_type:
+            case "transcript":
+                # Extract all text from all paragraphs
+                full_text = " ".join(paragraph.text for paragraph in doc.paragraphs)
+                result = " ".join(full_text.split())
+                return result
+
+            case "presentation":
+                # Treat each paragraph as a potential slide
+                # This is a heuristic - DOCX doesn't have explicit slides
+                markdown_sections = []
+                for i, paragraph in enumerate(doc.paragraphs):
+                    if paragraph.text.strip():  # Skip empty paragraphs
+                        cleaned_text = " ".join(paragraph.text.split())
+                        markdown_sections.append(
+                            f"# Slide Page {i + 1}\n{cleaned_text}"
+                        )
+
+                return (
+                    "\n\n".join(markdown_sections)
+                    if markdown_sections
+                    else "# Slide Page 1\n"
+                )
+
+    def _extract_pptx(
+        self, file_path: Path, extraction_type: Literal["transcript", "presentation"]
+    ) -> str:
+        """Extract text from PPTX using python-pptx (free, no PyMuPDF Pro needed)."""
+        # Load presentation (python-pptx accepts str path)
+        prs = Presentation(str(file_path))
+
+        match extraction_type:
+            case "transcript":
+                # Extract all text from all slides
+                all_text = []
+                for slide in prs.slides:
+                    for shape in slide.shapes:
+                        if shape.has_text_frame:
+                            for paragraph in shape.text_frame.paragraphs:  # type: ignore
+                                for run in paragraph.runs:
+                                    all_text.append(run.text)
+
+                full_text = " ".join(all_text)
+                result = " ".join(full_text.split())
+                return result
+
+            case "presentation":
+                # Extract text slide by slide
+                markdown_sections = []
+                for i, slide in enumerate(prs.slides):
+                    slide_text_parts = []
+                    for shape in slide.shapes:
+                        if shape.has_text_frame:
+                            for paragraph in shape.text_frame.paragraphs:  # type: ignore
+                                for run in paragraph.runs:
+                                    slide_text_parts.append(run.text)
+
+                    slide_text = " ".join(slide_text_parts)
+                    cleaned_text = " ".join(slide_text.split())
+                    markdown_sections.append(f"# Slide Page {i + 1}\n{cleaned_text}")
+
+                return "\n\n".join(markdown_sections)
+
+    def _extract_txt(
+        self, file_path: Path, extraction_type: Literal["transcript", "presentation"]
+    ) -> str:
+        """Extract text from plain text files."""
+        # Read as UTF-8 text
+        content = file_path.read_text(encoding="utf-8")
+
+        match extraction_type:
+            case "transcript":
+                # Single line, no extra spaces
+                result = " ".join(content.split())
+                return result
+
+            case "presentation":
+                # For TXT, treat each line as a potential section
+                lines = [line.strip() for line in content.splitlines() if line.strip()]
+                markdown_sections = [
+                    f"# Slide Page {i + 1}\n{line}" for i, line in enumerate(lines)
+                ]
+                return (
+                    "\n\n".join(markdown_sections)
+                    if markdown_sections
+                    else "# Slide Page 1\n"
+                )
+
     def _extract_document(
         self, file_path: Path, extraction_type: Literal["transcript", "presentation"]
     ) -> str:
-        """Extract text from document (PDF or TXT).
+        """Extract text from document.
 
-        Automatically detects file type. PDF uses standard extraction,
-        TXT files are opened with filetype='txt'.
+        Supports: PDF (pymupdf4llm), DOCX (python-docx), PPTX (python-pptx), TXT.
+        All formats are free and don't require PyMuPDF Pro.
         """
+        suffix = file_path.suffix.lower()
+
         try:
-            # Read file into memory first (snapshot) - protects against file changes/deletion
-            data = file_path.read_bytes()
-
-            # Detect file type from extension
-            suffix = file_path.suffix.lower()
-            filetype = "txt" if suffix == ".txt" else "pdf"
-
-            with pymupdf.open(stream=data, filetype=filetype) as doc:
-                match extraction_type:
-                    case "transcript":
-                        # extract all text from document and remove extra spaces, one line full text just.
-                        full_text = "".join(page.get_text("text") for page in doc)  # type: ignore
-                        result = " ".join(full_text.split())
-                        return result
-
-                    case "presentation":
-                        # for page by page, extract text and remove extra spaces, one line full text just. put new lines between pages.
-                        markdown_sections = []
-                        for i, page in enumerate(doc):  # type: ignore
-                            page_text = page.get_text("text")
-                            cleaned_text = " ".join(page_text.split())
-                            markdown_sections.append(
-                                f"# Slide Page {i + 1}\n{cleaned_text}"
-                            )
-
-                        return "\n\n".join(markdown_sections)
+            match suffix:
+                case ".pdf":
+                    return self._extract_pdf(file_path, extraction_type)
+                case ".docx":
+                    return self._extract_docx(file_path, extraction_type)
+                case ".pptx":
+                    return self._extract_pptx(file_path, extraction_type)
+                case ".txt":
+                    return self._extract_txt(file_path, extraction_type)
+                case _:
+                    raise ValueError(
+                        f"Unsupported file format: {suffix}. "
+                        f"Supported formats: .pdf, .docx, .pptx, .txt"
+                    )
         except Exception as e:
             raise RuntimeError(
                 f"Document extraction failed for {file_path} ({extraction_type}): {e}"
@@ -53,14 +178,45 @@ class SectionProducer:
 
     def generate_template(self, presentation_path: Path) -> list[Section]:
         """
-        Extract slide count from presentation PDF and generate empty sections.
+        Extract slide count from presentation file and generate empty sections.
+        Supports: PDF, DOCX, PPTX, TXT (all free, no PyMuPDF Pro needed).
         No LLM call, fully offline.
         """
+        suffix = presentation_path.suffix.lower()
+
         try:
-            # Read file into memory first (snapshot)
-            data = presentation_path.read_bytes()
-            with pymupdf.open(stream=data, filetype="pdf") as doc:
-                slide_count = len(doc)
+            match suffix:
+                case ".pdf":
+                    # Use pymupdf4llm to get page chunks
+                    chunks = pymupdf4llm.to_markdown(
+                        str(presentation_path), page_chunks=True
+                    )
+                    slide_count = len(chunks)
+
+                case ".docx":
+                    # Count non-empty paragraphs as slides
+                    doc = Document(str(presentation_path))
+                    slide_count = sum(1 for p in doc.paragraphs if p.text.strip())
+                    slide_count = max(slide_count, 1)  # At least 1 slide
+
+                case ".pptx":
+                    # Count slides directly
+                    prs = Presentation(str(presentation_path))
+                    slide_count = len(prs.slides)
+
+                case ".txt":
+                    # Count non-empty lines as slides
+                    content = presentation_path.read_text(encoding="utf-8")
+                    lines = [
+                        line.strip() for line in content.splitlines() if line.strip()
+                    ]
+                    slide_count = max(len(lines), 1)  # At least 1 slide
+
+                case _:
+                    raise ValueError(
+                        f"Unsupported file format: {suffix}. "
+                        f"Supported formats: .pdf, .docx, .pptx, .txt"
+                    )
 
             return [
                 Section(section_index=i + 1, content="") for i in range(slide_count)

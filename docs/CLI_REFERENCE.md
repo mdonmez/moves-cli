@@ -44,7 +44,8 @@ moves speaker add NAME SOURCE_PRESENTATION SOURCE_TRANSCRIPT
 
 **Arguments:**
 - `NAME` (required) – Speaker/presentation name
-- `SOURCE_PRESENTATION` (required) – Path to PDF or Google Drive URL
+- `SOURCE_PRESENTATION` (required) – Path to presentation file or Google Drive URL
+  - **Supported formats:** PDF, DOCX, PPTX, TXT (all 100% free, no commercial licenses)
 - `SOURCE_TRANSCRIPT` (required) – Path to transcript or Google Drive URL
 
 **Example:**
@@ -92,7 +93,7 @@ moves speaker edit SPEAKER [OPTIONS]
 - `SPEAKER` (required) – Speaker name or ID
 
 **Options:**
-- `--presentation PATH, -p PATH` – New presentation file path or URL
+- `--presentation PATH, -p PATH` – New presentation file path or URL (PDF, DOCX*, PPTX*, TXT, etc.)
 - `--transcript PATH, -t PATH` – New transcript file path or URL
 
 **Requirements:**

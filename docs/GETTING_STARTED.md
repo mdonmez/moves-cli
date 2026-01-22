@@ -76,8 +76,14 @@ dir $env:USERPROFILE\.moves
 ### Gather Your Materials
 
 You'll need:
-1. **Presentation file** – PDF of your slides (e.g., `my_talk.pdf`)
+1. **Presentation file** – Your slides in PDF, DOCX, PPTX, or TXT format (e.g., `my_talk.pdf`, `my_talk.pptx`)
 2. **Transcript file** – Text file with what you'll say (e.g., `my_talk.txt`)
+
+**Supported presentation formats:** All formats are **100% free** with no commercial licenses required!
+- **PDF** - Via PyMuPDF4LLM (optimized for LLM processing)
+- **DOCX** - Via python-docx (Microsoft Word documents)
+- **PPTX** - Via python-pptx (PowerPoint presentations)
+- **TXT** - Native text file support
 
 The transcript should be organized roughly by slide, like:
 
@@ -401,11 +407,16 @@ This is normal if you edited sections.md manually. Choose:
 
 ### Q: Can I use my own presentation slides (not PDF)?
 
-**A:** Currently, PDF is the primary format. If you have PowerPoint/Google Slides:
-1. Export as PDF first
-2. Then add to `moves`
+**A:** Yes! moves-cli supports multiple formats with **100% free, open-source libraries**:
+- **PDF** - PyMuPDF4LLM (optimized for LLM processing)
+- **DOCX** - python-docx (Word documents)
+- **PPTX** - python-pptx (PowerPoint presentations)
+- **TXT** - Native text support
 
-Support for other formats may be added in future versions.
+No commercial licenses or PyMuPDF Pro required! Just provide the file path directly:
+```powershell
+moves speaker add MyTalk C:\talks\my_talk.pptx C:\talks\my_talk.txt
+```
 
 ### Q: What if my transcript doesn't perfectly match my slides?
 
@@ -471,14 +482,19 @@ This will overwrite your manual edits. If you had custom content, keep a backup.
 - Speaker data: ~1-10MB per speaker (depending on presentation size)
 - Total: ~500MB + speaker data
 
-### Q: Can I export my slides from a presentation tool?
+### Q: Can I use slides from presentation tools directly?
 
-**A:** Yes! Most tools can export to PDF:
-- **PowerPoint**: File → Export as PDF
-- **Google Slides**: File → Download → PDF
+**A:** Yes! moves-cli supports multiple formats:
+- **PDF** - Direct support (no export needed)
+- **PPTX** - Direct support with PyMuPDF Pro
+- **DOCX** - Direct support with PyMuPDF Pro
+
+If you prefer PDF or don't have PyMuPDF Pro:
+- **PowerPoint**: File → Export as PDF or use .pptx directly
+- **Google Slides**: File → Download → PDF (or PPTX)
 - **LibreOffice**: File → Export as PDF
 
-Then use the PDF with `moves`.
+Then use the file with `moves`.
 
 ### Q: What happens if I interrupt preparation?
 

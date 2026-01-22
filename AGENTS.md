@@ -4,9 +4,9 @@ This document provides guidelines for AI agents working on the moves-cli codebas
 
 ## Project Overview
 
-moves-cli is a Python CLI tool for voice-controlled presentation navigation. It extracts slides from PDFs, analyzes transcripts with LLMs, performs real-time speech recognition, and matches speech to presentation content.
+moves-cli is a Python CLI tool for voice-controlled presentation navigation. It extracts slides from multiple formats (PDF, DOCX, PPTX, TXT), analyzes transcripts with LLMs, performs real-time speech recognition, and matches speech to presentation content.
 
-**Tech Stack**: Python 3.13+, Typer (CLI), Rich (UI), Sherpa-ONNX (speech recognition), FastEmbed (embeddings), LiteLLM (LLM abstraction)
+**Tech Stack**: Python 3.13+, Typer (CLI), Rich (UI), Sherpa-ONNX (speech recognition), FastEmbed (embeddings), LiteLLM (LLM abstraction), PyMuPDF4LLM (PDF), python-pptx (PPTX), python-docx (DOCX)
 
 ## Build, Lint, and Test Commands
 
@@ -145,13 +145,16 @@ def load_from_markdown(self, markdown_content: str) -> list[Section]:
 
 ### File Operations
 - Use `pathlib.Path` for all file paths
-- Read files into memory for snapshot behavior (protects against changes)
+- Convert Path to str when needed for libraries (e.g., `str(file_path)`)
 - Use context managers (`with` statements)
 
 ```python
-data = file_path.read_bytes()
-with pymupdf.open(stream=data, filetype="pdf") as doc:
-    ...
+# PDF extraction with PyMuPDF4LLM
+chunks = pymupdf4llm.to_markdown(str(file_path), page_chunks=True)
+
+# Office document extraction
+doc = Document(str(file_path))  # python-docx
+prs = Presentation(str(file_path))  # python-pptx
 ```
 
 ### Error Handling

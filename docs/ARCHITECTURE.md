@@ -8,7 +8,7 @@ This document explains how `moves` is structured and how its core components wor
 User Input (Speaker Profile)
         ↓
     [Preparation Phase]
-        ├─ PDF Extraction → Identify slide boundaries
+        ├─ Document Extraction → Identify slide boundaries (PDF, DOCX, PPTX, TXT, etc.)
         ├─ Transcript Analysis → Segment by sections
         ├─ LLM Processing → Generate speech labels (optional)
         └─ Output: sections.md
@@ -37,7 +37,7 @@ User Input (Speaker Profile)
 
 **File Hashing**:
 Uses XXH3-64 hashing to detect file changes:
-- `presentation_hash` – Hash of source PDF at last processing
+- `presentation_hash` – Hash of source presentation file at last processing
 - `transcript_hash` – Hash of transcript at last processing
 - `sections_hash` – Hash of normalized sections.md at last control session
 
@@ -110,6 +110,13 @@ Slide advances when similarity score ≥ `SIMILARITY_THRESHOLD` (default: 0.7)
 **Section Producer** (`section_producer.py`):
 - Parses markdown format (sections.md) into Section objects
 - Handles markdown-to-plain-text conversion
+- Extracts text from multiple document formats using **100% free libraries**:
+  - **PDF** - PyMuPDF4LLM (LLM-optimized markdown extraction)
+  - **DOCX** - python-docx (Microsoft Word)
+  - **PPTX** - python-pptx (PowerPoint)
+  - **TXT** - Native text file support
+  - No commercial licenses (PyMuPDF Pro) required
+  - Automatic format detection based on file extension
 
 ### 5. Settings Editor (`settings_editor.py`)
 
@@ -133,7 +140,7 @@ Slide advances when similarity score ≥ `SIMILARITY_THRESHOLD` (default: 0.7)
 └──────────────┬──────────────────┘
                ↓
         ┌──────────────────┐
-        │  PDF Extraction  │ → Extract slide boundaries
+        │ Document Extraction │ → Extract slide boundaries (multi-format)
         └──────────┬───────┘
                    ↓
         ┌──────────────────────┐
