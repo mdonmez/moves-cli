@@ -1,39 +1,42 @@
 # Configuration Guide
 
-Detailed documentation for configuring `moves`, including LLM providers, API keys, and tuning options.
+Complete guide to configuring `moves`, including LLM providers, API keys, and performance tuning.
 
 ## Table of Contents
 
 1. [Basic Configuration](#basic-configuration)
 2. [LLM Providers](#llm-providers)
-3. [API Keys & Security](#api-keys--security)
+3. [API Key Security](#api-key-security)
 4. [Configuration Files](#configuration-files)
 5. [Performance Tuning](#performance-tuning)
 6. [Advanced Settings](#advanced-settings)
+7. [Troubleshooting](#troubleshooting)
+
+---
 
 ## Basic Configuration
 
 ### What You Need to Configure
 
-Two main settings control `moves` behavior:
+Two settings control section generation:
 
-1. **LLM Model** – Which AI model to use for section generation
-2. **API Key** – Authentication for your chosen LLM provider
+| Setting | Purpose | Storage |
+|---------|---------|---------|
+| `model` | LLM model for section generation | `~/.moves/settings.toml` |
+| `key` | API key for LLM provider | System keyring (secure) |
 
-### Quick Setup (Google Gemini - Recommended)
+### Quick Setup (Google Gemini – Free)
 
-Google Gemini is free and doesn't require a credit card:
-
-```powershell
+```bash
 # 1. Get free API key from https://aistudio.google.com/app/apikey
-# 2. Configure in moves
+# 2. Configure moves
 moves settings set model gemini/gemini-2.5-flash-lite
 moves settings set key
-# 3. Paste API key when prompted (text hidden)
+# 3. Paste your API key when prompted
 ```
 
-Verify:
-```powershell
+Verify configuration:
+```bash
 moves settings list
 ```
 
@@ -41,449 +44,440 @@ moves settings list
 
 ## LLM Providers
 
-`moves` uses [LiteLLM](https://docs.litellm.ai/), which supports **100+ models** across multiple providers.
+`moves` uses [LiteLLM](https://docs.litellm.ai/), supporting 100+ LLM providers.
 
-### Recommended Providers
+### Google Gemini ⭐ Recommended (Free)
 
-#### 1. Google Gemini (Free) ⭐ Best for Beginners
+**Why:** Free tier, no credit card, good quality.
 
-**Why**: Free tier, no credit card required, good quality, works for English.
-
-**Setup**:
+**Setup:**
 1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
 2. Sign in with Google account
 3. Click "Create API key"
-4. Copy key
+4. Copy the key
 
-**Configure**:
-```powershell
+**Configure:**
+```bash
 moves settings set model gemini/gemini-2.5-flash-lite
 moves settings set key
-# Paste: [your-api-key]
+# Paste your API key
 ```
 
-**Available Models**:
-- `gemini/gemini-2.5-flash-lite` (recommended, fastest)
-- `gemini/gemini-2.5-flash`
-- `gemini/gemini-1.5-pro`
+**Models:**
+| Model | Speed | Quality |
+|-------|-------|---------|
+| `gemini/gemini-2.5-flash-lite` | Fast | Good (recommended) |
+| `gemini/gemini-2.5-flash` | Medium | Better |
+| `gemini/gemini-1.5-pro` | Slower | Best |
 
 ---
 
-#### 2. OpenAI (Paid) ✓ Reliable
+### OpenAI (Paid)
 
-**Why**: Very reliable, excellent model quality, pay-as-you-go.
+**Why:** Reliable, excellent quality, pay-as-you-go.
 
-**Cost**: ~$0.50-$2 per presentation prep (typical usage).
+**Cost:** ~$0.01-$0.10 per preparation (typical).
 
-**Setup**:
+**Setup:**
 1. Create account at [OpenAI Platform](https://platform.openai.com/)
 2. Add payment method
 3. Go to [API Keys](https://platform.openai.com/account/api-keys)
 4. Create new key
 
-**Configure**:
-```powershell
+**Configure:**
+```bash
 moves settings set model gpt-4o-mini
 moves settings set key
-# Paste: [your-api-key]
+# Paste your OpenAI API key
 ```
 
-**Available Models**:
-- `gpt-4o-mini` (recommended, fast and cheap)
-- `gpt-4o`
-- `gpt-4-turbo`
+**Models:**
+| Model | Speed | Quality | Cost |
+|-------|-------|---------|------|
+| `gpt-4o-mini` | Fast | Good | Low |
+| `gpt-4o` | Medium | Better | Medium |
+| `gpt-4-turbo` | Slower | Best | Higher |
 
 ---
 
-#### 3. Anthropic Claude (Paid) ✓ High Quality
+### Anthropic Claude (Paid)
 
-**Why**: Excellent reasoning, good for complex transcripts.
+**Why:** Excellent reasoning, good for complex transcripts.
 
-**Cost**: ~$1-$3 per presentation prep.
-
-**Setup**:
+**Setup:**
 1. Create account at [Anthropic Console](https://console.anthropic.com/)
 2. Add payment method
-3. Go to API Keys section
-4. Create new key
+3. Create API key
 
-**Configure**:
-```powershell
+**Configure:**
+```bash
 moves settings set model claude-3-5-sonnet
 moves settings set key
-# Paste: [your-api-key]
+# Paste your Anthropic API key
 ```
 
-**Available Models**:
-- `claude-3-5-sonnet` (recommended)
-- `claude-3-opus`
-- `claude-3-haiku`
+**Models:**
+| Model | Speed | Quality |
+|-------|-------|---------|
+| `claude-3-haiku` | Fast | Good |
+| `claude-3-5-sonnet` | Medium | Better |
+| `claude-3-opus` | Slower | Best |
 
 ---
 
-#### 4. Other Providers Supported
+### Groq (Free Tier)
 
-LiteLLM supports many more:
+**Why:** Free tier available, fast inference.
 
-| Provider | Model | Cost |
-|----------|-------|------|
-| Hugging Face | `huggingface/model-name` | Free |
-| Groq | `groq/mixtral-8x7b-32768` | Free |
-| Together AI | `together_ai/model` | Free/Paid |
-| Azure OpenAI | `azure/model` | Paid |
-| Replicate | `replicate/model` | Paid |
+**Setup:**
+1. Create account at [Groq Console](https://console.groq.com/)
+2. Get API key
 
-See [LiteLLM Docs](https://docs.litellm.ai/docs/providers) for full list.
-
----
-
-## API Keys & Security
-
-### Storing API Keys Securely
-
-`moves` uses **Windows Credential Manager** to store API keys:
-
-- **Never stored as plain text** in config files
-- **System-level security** – Windows encrypts them
-- **Per-user** – Only accessible by your Windows account
-
-### Setting an API Key
-
-```powershell
+**Configure:**
+```bash
+moves settings set model groq/mixtral-8x7b-32768
 moves settings set key
+# Paste your Groq API key
 ```
 
-**Important**: 
-- Text input is **hidden** for security
-- Press Enter when done
-- Paste (Ctrl+V) works fine
+---
 
-### Viewing Your API Key
+### Other Providers
 
-To see if a key is set:
-```powershell
+LiteLLM supports many more providers. See [LiteLLM Providers](https://docs.litellm.ai/docs/providers) for full list.
+
+| Provider | Model Format | Free Tier |
+|----------|--------------|-----------|
+| Hugging Face | `huggingface/<model>` | Yes |
+| Together AI | `together_ai/<model>` | Yes |
+| Azure OpenAI | `azure/<deployment>` | No |
+| AWS Bedrock | `bedrock/<model>` | No |
+
+---
+
+## API Key Security
+
+### How Keys Are Stored
+
+`moves` stores API keys securely using the system keyring:
+
+| Platform | Storage |
+|----------|---------|
+| Windows | Windows Credential Manager |
+| macOS | Keychain |
+| Linux | Secret Service (GNOME Keyring, KWallet, etc.) |
+
+**Keys are:**
+- Never stored in plain text files
+- Encrypted by the operating system
+- Only accessible by your user account
+
+### Managing Keys
+
+**Set a key:**
+```bash
+moves settings set key
+# Input is hidden for security
+```
+
+**View key (masked):**
+```bash
 moves settings list
+# Shows: gemi****b8fk
 ```
 
-Shows masked format: `gemi****b8fk`
-
-To see full key (use carefully):
-```powershell
+**View key (full):**
+```bash
 moves settings list --show
+# Shows: gemiXXXXXXXXXXXXb8fk
 ```
 
-### Changing Your API Key
-
-To update with a new key:
-```powershell
-moves settings set key
-# Enter new key
-```
-
-Previous key is replaced.
-
-### Removing Your API Key
-
-To remove/reset:
-```powershell
+**Remove key:**
+```bash
 moves settings unset key
 ```
 
-Then you'll need to set it again before using auto-preparation.
+### Windows Credential Manager
 
-### Troubleshooting API Keys
-
-**"Invalid API key"**
-- Double-check you copied the full key
-- Check that the key hasn't expired
-- Verify it's for the correct model provider
-
-**"Access denied"**
-- Key might not have required permissions
-- Try generating a new key from provider
-
-**"Rate limit exceeded"**
-- Too many API calls in short time
-- Wait a few minutes
-- Consider upgrading your plan
+To view stored credentials manually:
+1. Open "Credential Manager" from Start menu
+2. Select "Windows Credentials"
+3. Look for `moves-cli` entries
 
 ---
 
 ## Configuration Files
 
-### Location
-
-All configuration is stored in: `C:\Users\<YourUsername>\.moves\`
+### File Locations
 
 ```
 ~/.moves/
-├── settings.toml          # LLM model config (plain text)
-├── settings.key           # API key (in Credential Manager)
-├── ml_models/             # ONNX models (downloaded automatically)
+├── settings.toml              # LLM model configuration
+├── ml_models/                 # Downloaded ONNX models
 │   ├── all-MiniLM-L6-v2_quint8_avx2/
-│   └── nemo-streaming-stt-480ms-int8/
-└── speakers/              # Speaker data
+│   ├── nemo-streaming-stt-480ms-int8/
+│   └── silero-vad-int8/
+└── speakers/                  # Speaker data
     └── <speaker-id>/
-        ├── speaker.yaml
-        └── sections.md
+        ├── speaker.yaml       # Metadata and hashes
+        └── sections.md        # Speech content
 ```
 
 ### settings.toml
 
-Contains your LLM model choice. Example:
+Contains your LLM model choice:
 
 ```toml
+# moves CLI Configuration
+
+# Note: API key is stored securely in system keyring
+
+# LLM model for speaker processing, find models at: https://models.litellm.ai/
 model = "gemini/gemini-2.5-flash-lite"
 ```
 
-You can edit this directly if needed:
-
-```powershell
-notepad $env:USERPROFILE\.moves\settings.toml
+Edit directly:
+```bash
+nano ~/.moves/settings.toml
 ```
 
-But use the CLI for safety:
-
-```powershell
+Or use the CLI:
+```bash
 moves settings set model gemini/gemini-2.5-flash-lite
 ```
 
-### Credential Manager (API Key)
+### speaker.yaml
 
-Your API key is stored in Windows Credential Manager:
+Per-speaker metadata (created automatically):
 
-**To view manually:**
-1. Settings → Manage credentials (search)
-2. Select "Windows Credentials"
-3. Look for `moves-api-key`
-
-**Via command line:**
-```powershell
-# View all stored credentials
-cmdkey /list
+```yaml
+name: MyTalk
+speaker_id: a1b2c
+source_presentation: /path/to/presentation.pdf
+source_transcript: /path/to/transcript.txt
+last_processed: '2024-01-15T14:30:00'
+presentation_hash: abc123def456
+transcript_hash: 789xyz012345
+sections_hash: fedcba987654
 ```
 
 ---
 
 ## Performance Tuning
 
-Configuration options in [config.py](../src/moves_cli/config.py) that affect behavior:
+Configuration constants are in `src/moves_cli/config.py`. Currently requires source code editing.
 
-### Similarity Matching Tuning
-
-```python
-SEMANTIC_WEIGHT = 0.6           # 60% semantic matching
-PHONETIC_WEIGHT = 0.4           # 40% phonetic matching
-SIMILARITY_THRESHOLD = 0.7      # Minimum score to auto-advance
-```
-
-**Adjust if:**
-- **Too many false positives** (advancing too easily)
-  - Increase `SIMILARITY_THRESHOLD` (0.8-0.9)
-  - Increase `SEMANTIC_WEIGHT` (0.7-0.8)
-- **Missing advances** (need to navigate manually)
-  - Decrease `SIMILARITY_THRESHOLD` (0.5-0.6)
-  - Decrease `SEMANTIC_WEIGHT` (0.4-0.5)
-
-**Note**: Currently requires editing source code and reinstalling.
-
-### Voice Activity Detection (VAD) Tuning
+### Similarity Matching
 
 ```python
-VAD_THRESHOLD = 0.35            # Lower = more sensitive
-VAD_MIN_SILENCE = 0.5           # Seconds to end speech
-VAD_MIN_SPEECH = 0.1            # Minimum speech length
+SEMANTIC_WEIGHT = 0.6          # Weight for semantic (embedding) matching
+PHONETIC_WEIGHT = 0.4          # Weight for phonetic (sound) matching
+SIMILARITY_THRESHOLD = 0.7     # Minimum score to auto-advance (0.0-1.0)
 ```
 
-**Adjust if:**
-- **Background noise being detected**
-  - Increase `VAD_THRESHOLD` (0.5-0.7)
-- **Speech not being detected**
-  - Decrease `VAD_THRESHOLD` (0.1-0.2)
-- **Pauses within phrases cutting segments**
-  - Increase `VAD_MIN_SILENCE` (1.0-2.0)
-
-**Note**: These are tuned for typical office/home environments.
+**Tuning:**
+| Issue | Adjustment |
+|-------|------------|
+| Too many false positives | Increase `SIMILARITY_THRESHOLD` (0.8-0.9) |
+| Missing advances | Decrease `SIMILARITY_THRESHOLD` (0.5-0.6) |
+| Emphasis on meaning | Increase `SEMANTIC_WEIGHT` |
+| Emphasis on pronunciation | Increase `PHONETIC_WEIGHT` |
 
 ### Chunk Generation
 
 ```python
-WINDOW_SIZE = 12                # Words per chunk (larger = broader matches)
-CANDIDATE_RANGE_MIN_OFFSET = -3 # Search 3 slides back
-CANDIDATE_RANGE_MAX_OFFSET = 5  # Search 5 slides forward
+WINDOW_SIZE = 12                    # Words per matching chunk
+CANDIDATE_RANGE_MIN_OFFSET = -3     # Search 3 slides back
+CANDIDATE_RANGE_MAX_OFFSET = 5      # Search 5 slides forward
 ```
 
-**Adjust if:**
-- **Matching too sensitive to exact wording**
-  - Increase `WINDOW_SIZE` (15-20)
-- **Missing slides that have different wording**
-  - Decrease `WINDOW_SIZE` (8-10)
+**Tuning:**
+| Issue | Adjustment |
+|-------|------------|
+| Too sensitive to exact wording | Increase `WINDOW_SIZE` (15-20) |
+| Missing similar content | Decrease `WINDOW_SIZE` (8-10) |
+| Slow matching | Decrease offset range |
+
+### Voice Activity Detection (VAD)
+
+```python
+VAD_THRESHOLD = 0.35           # Lower = more sensitive (0.1-0.9)
+VAD_MIN_SILENCE = 0.5          # Seconds of silence to end segment
+VAD_MIN_SPEECH = 0.1           # Minimum speech duration to detect
+VAD_WINDOW_SIZE = 512          # Analysis window (~32ms at 16kHz)
+VAD_BUFFER_SIZE = 30.0         # Circular buffer in seconds
+```
+
+**Tuning:**
+| Issue | Adjustment |
+|-------|------------|
+| Background noise detected | Increase `VAD_THRESHOLD` (0.5-0.7) |
+| Speech not detected | Decrease `VAD_THRESHOLD` (0.1-0.2) |
+| Pauses cutting phrases | Increase `VAD_MIN_SILENCE` (1.0-2.0) |
 
 ---
 
 ## Advanced Settings
 
-### Using Multiple API Keys
+### Using Multiple LLM Providers
 
-If you want to test different providers:
+You can switch providers anytime:
 
-```powershell
-# Set key for provider A
+```bash
+# Use Gemini
+moves settings set model gemini/gemini-2.5-flash-lite
 moves settings set key
-# Paste: provider-a-key
-
-# Prepare speakers
 moves speaker prepare MyTalk
 
-# Switch to provider B
+# Switch to OpenAI
+moves settings set model gpt-4o-mini
 moves settings set key
-# Paste: provider-b-key
-
-# Prepare same speaker again (regenerates with provider B)
-moves speaker prepare MyTalk
+moves speaker prepare MyTalk  # Re-generates with new model
 ```
-
-Both preparations will be saved in the speaker's metadata.
 
 ### Custom LLM Prompts
 
-The LLM instruction used during preparation is in:
+The LLM instruction is in `src/moves_cli/data/llm_instruction.md`. To customize:
 
-`src/moves_cli/data/llm_instruction.md`
+1. Edit the file in source
+2. Rebuild and reinstall moves
+3. See [Development Guide](DEVELOPMENT.md)
 
-This file is bundled with `moves` and controls how the LLM generates sections. Modifying this requires:
+### Offline Mode
 
-1. Editing the file in source
-2. Rebuilding `moves` from source
-3. See [Development Guide](DEVELOPMENT.md) for building
+For fully offline operation:
 
-### Offline Preparation (Manual Mode)
-
-If you want to prepare speakers completely offline:
-
-```powershell
+```bash
+# Prepare with manual mode (no LLM)
 moves speaker prepare MyTalk --manual
-```
 
-This generates an empty template that you manually edit:
+# Edit sections.md manually
+nano ~/.moves/speakers/a1b2c/sections.md
 
-```powershell
-notepad $env:USERPROFILE\.moves\speakers\a1b2c\sections.md
+# Present (fully offline after models downloaded)
+moves present MyTalk
 ```
 
 ### Environment Variables
 
-Currently, `moves` doesn't use environment variables for configuration. All settings go through the CLI or config files.
+Currently, `moves` doesn't use environment variables. All configuration goes through the CLI or config files.
 
 ---
 
-## Troubleshooting Configuration
+## Troubleshooting
 
-### "Setting model failed"
+### "LLM model not configured"
 
-**Cause**: Invalid model name.
+**Cause:** No model set.
 
-**Solution**: Check supported models at [LiteLLM Docs](https://docs.litellm.ai/docs/providers).
-
-```powershell
-# Example: Correct format
+**Solution:**
+```bash
 moves settings set model gemini/gemini-2.5-flash-lite
-# Not: moves settings set model Gemini 2.5 Flash
 ```
 
-### "LLM API key error during preparation"
+### "LLM API key not configured"
 
-**Causes**:
-1. Invalid or expired key
-2. Model name mismatch with key provider
-3. No remaining API quota
+**Cause:** No API key set.
 
-**Solutions**:
-```powershell
-# Verify settings
-moves settings list
-
-# Test with different provider
-moves settings set model gpt-4o-mini
+**Solution:**
+```bash
 moves settings set key
-# Paste OpenAI key
-moves speaker prepare MyTalk
+# Paste your key
 ```
 
-### "Models taking too long to download"
+### "Invalid API key"
 
-**Cause**: First run downloads ~400-500MB of ONNX models.
+**Causes:**
+- Key copied incorrectly
+- Key expired or revoked
+- Key for wrong provider
 
-**Solution**: Wait for completion (5-10 minutes typical). Check progress:
+**Solutions:**
+- Verify the key is complete
+- Generate a new key from your provider
+- Ensure model and key match (e.g., Gemini key with Gemini model)
 
-```powershell
-dir $env:USERPROFILE\.moves\ml_models
+### "Rate limit exceeded"
+
+**Cause:** Too many API calls in short time.
+
+**Solutions:**
+- Wait a few minutes
+- Upgrade your provider plan
+- Use `--yes` to batch process (reduces confirmations)
+
+### Models Download Slow
+
+**Cause:** First run downloads ~500MB of ONNX models.
+
+**Solution:** Wait for completion. Check progress:
+```bash
+ls -la ~/.moves/ml_models/
 ```
 
-### "Credential Manager not available"
+### Keyring Not Available
 
-**On non-Windows systems**: The tool expects Windows Credential Manager. On macOS/Linux, uses system keyring.
+**Cause:** System keyring not configured.
 
-**Solution**: Ensure you're on Windows 10+ or use manual `--manual` mode.
+**Solutions:**
+- **Linux:** Install and start `gnome-keyring` or `kwallet`
+- **macOS:** Ensure Keychain is unlocked
+- **Windows:** Should work out of box
 
 ---
 
 ## Configuration Examples
 
-### Example 1: Use Google Gemini
+### Example 1: Free Setup with Gemini
 
-```powershell
-# One-time setup
+```bash
+# Get API key from https://aistudio.google.com/app/apikey
 moves settings set model gemini/gemini-2.5-flash-lite
 moves settings set key
-# Paste your free API key from: https://aistudio.google.com/app/apikey
+# Paste key
 
-# Ready to use
-moves speaker add MyTalk talk.pdf transcript.txt
+# Prepare and present
+moves speaker add MyTalk slides.pdf notes.txt
 moves speaker prepare MyTalk
 moves present MyTalk
 ```
 
-### Example 2: Use OpenAI GPT-4o
+### Example 2: OpenAI for Better Quality
 
-```powershell
-# One-time setup
-moves settings set model gpt-4o-mini
+```bash
+moves settings set model gpt-4o
 moves settings set key
-# Paste your paid OpenAI API key
+# Paste OpenAI key
 
-# Ready to use
-moves speaker prepare MyTalk --yes
+moves speaker prepare MyTalk
+```
+
+### Example 3: Fully Offline
+
+```bash
+# No LLM configuration needed
+moves speaker add MyTalk slides.pdf notes.txt
+moves speaker prepare MyTalk --manual
+
+# Edit sections.md manually
+nano ~/.moves/speakers/a1b2c/sections.md
+
+# Present (fully offline)
 moves present MyTalk
 ```
 
-### Example 3: Hybrid (Auto + Manual)
+### Example 4: Hybrid Approach
 
-```powershell
+```bash
 # Use LLM for initial generation
 moves settings set model gemini/gemini-2.5-flash-lite
 moves settings set key
 moves speaker prepare MyTalk
 
-# Manually fine-tune
-notepad $env:USERPROFILE\.moves\speakers\a1b2c\sections.md
-# Edit as needed
+# Fine-tune manually
+nano ~/.moves/speakers/a1b2c/sections.md
 
-# Use manually tuned version for presentation
-moves present MyTalk
-```
-
-### Example 4: Offline (Manual Only)
-
-```powershell
-# No LLM needed
-moves speaker add MyTalk talk.pdf transcript.txt
-moves speaker prepare MyTalk --manual
-
-# Manually create content
-notepad $env:USERPROFILE\.moves\speakers\a1b2c\sections.md
-
-# Present without any API keys
+# Present with custom edits
 moves present MyTalk
 ```
 
@@ -491,15 +485,15 @@ moves present MyTalk
 
 ## Best Practices
 
-1. **Use free tier first** – Test with Google Gemini before paying
-2. **Re-prepare after LLM changes** – Different models may generate different content
-3. **Keep API keys secure** – Never share or commit them
-4. **Regular backups** – Copy `~/.moves/speakers/` occasionally
-5. **Test audio first** – Verify microphone before presenting
+1. **Start with free tier** – Test with Gemini before paying
+2. **Re-prepare after model changes** – Different models generate different content
+3. **Keep keys secure** – Never share or commit API keys
+4. **Backup speaker data** – Periodically copy `~/.moves/speakers/`
+5. **Test before presenting** – Do a dry run in a quiet environment
 
 ---
 
-For more information, see:
-- [Getting Started Guide](GETTING_STARTED.md) – User walkthrough
-- [Architecture Guide](ARCHITECTURE.md) – Technical details
+For more information:
+- [Getting Started](GETTING_STARTED.md) – Step-by-step walkthrough
 - [CLI Reference](CLI_REFERENCE.md) – All commands
+- [Architecture](ARCHITECTURE.md) – How it works

@@ -1,377 +1,168 @@
 # Documentation Index
 
-A complete guide to all documentation for the `moves` presentation control system.
+Complete documentation for the `moves` CLI presentation control system.
 
 ## Quick Navigation
 
-### For Users
-
-**New to moves?**
-→ Start here: [Getting Started Guide](GETTING_STARTED.md)
-
-**Want to configure LLM?**
-→ See: [Configuration Guide](CONFIGURATION.md)
-
-**Need command documentation?**
-→ Reference: [CLI Reference](CLI_REFERENCE.md)
-
-**Curious about how it works?**
-→ Read: [Architecture Guide](ARCHITECTURE.md)
-
-### For Developers
-
-**Contributing code?**
-→ Start here: [Development Guide](DEVELOPMENT.md)
-
-**Understanding the system?**
-→ Read: [Architecture Guide](ARCHITECTURE.md)
+| I want to... | Go to |
+|--------------|-------|
+| Get started with moves | [Getting Started Guide](GETTING_STARTED.md) |
+| Configure LLM and API keys | [Configuration Guide](CONFIGURATION.md) |
+| Look up a command | [CLI Reference](CLI_REFERENCE.md) |
+| Understand how it works | [Architecture Guide](ARCHITECTURE.md) |
+| Contribute code | [Development Guide](DEVELOPMENT.md) |
+| Get a project overview | [README](../README.md) |
 
 ---
 
 ## Documentation Overview
 
 ### [README.md](../README.md)
-**Audience**: Everyone  
-**Purpose**: Project overview, features, quick start, installation
 
-**Contains**:
-- What is `moves` and what does it do
-- Key features summary
+**Audience**: Everyone
+
+Quick project introduction covering:
+- What moves does and key features
 - Installation instructions
-- Quick start (4-step setup)
-- Basic troubleshooting
-- License information
-
-**Read if**: You're new to the project or need a quick overview
-
----
+- 4-step quick start guide
+- System architecture overview
+- Supported file formats and LLM providers
+- Common troubleshooting
 
 ### [Getting Started Guide](GETTING_STARTED.md)
-**Audience**: End users  
-**Purpose**: Step-by-step walkthrough of using `moves`
 
-**Contains**:
-- Installation steps (Python, uv, moves)
-- Creating your first speaker profile
-- Two preparation methods (automatic with LLM, manual)
-- Giving your first presentation
-- Managing multiple speakers
-- Troubleshooting common issues
-- FAQ with 15+ common questions
+**Audience**: End users
 
-**Read if**: You're setting up `moves` for the first time
-
-**Sections**:
-1. Installation
-2. Initial Setup
-3. Creating Your First Speaker
-4. Preparing for Presentation
-5. Giving a Presentation
-6. Managing Speakers
-7. Troubleshooting
-8. FAQ
-
----
+Step-by-step walkthrough:
+1. Installation (Python, uv/pip, moves-cli)
+2. Understanding the data directory structure
+3. Creating speaker profiles (local files + Google Drive)
+4. Preparing presentations (auto LLM mode vs manual mode)
+5. Running presentations with keyboard controls
+6. Managing multiple speakers
+7. Troubleshooting common issues
+8. FAQ with 15+ questions
 
 ### [Architecture Guide](ARCHITECTURE.md)
-**Audience**: Developers, technical users  
-**Purpose**: Explain how `moves` is designed and how components work
 
-**Contains**:
-- High-level flow diagrams (preparation and presentation phases)
-- Core component descriptions with responsibilities
-- Data flow diagrams
-- File organization
-- Configuration parameters with explanations
-- Model dependencies
-- Error handling strategies
-- Thread safety considerations
-- Performance notes
+**Audience**: Developers, technical users
+
+System internals:
+- High-level preparation and presentation flow
+- Core components (SpeakerManager, PresentationController, SimilarityCalculator, etc.)
+- Data flow diagrams for both phases
+- File organization and project structure
+- Configuration parameters explained
+- Model dependencies (STT, VAD, embeddings)
+- Thread model and safety considerations
 - Extension points for customization
 
-**Read if**: You want to understand the system design or contribute code
-
-**Key Sections**:
-- High-Level Flow
-- Core Components (6 major components explained)
-- Data Flow (two detailed diagrams)
-- File Organization
-- Configuration Parameters
-- Extension Points
-
----
-
 ### [CLI Reference](CLI_REFERENCE.md)
-**Audience**: Users, developers  
-**Purpose**: Complete documentation of all commands and options
 
-**Contains**:
-- Syntax for every command
-- Arguments and options for each command
-- Real-world examples
-- Sample output
-- Error messages explained
+**Audience**: All users
+
+Complete command documentation:
+- Speaker commands: `add`, `edit`, `list`, `show`, `prepare`, `delete`
+- Presentation: `present` with keyboard shortcuts
+- Settings: `list`, `set`, `unset`
+- Examples, sample output, and error messages
+- Speaker resolution (by name or ID)
 - Common patterns and tips
-- Speaker resolution behavior
-
-**Organized by**:
-- Speaker management (add, edit, list, show, prepare, delete)
-- Presentation control (present)
-- Settings management (list, set, unset)
-
-**Read if**: You need to know exactly how to use a specific command
-
-**Length**: ~500 lines with extensive examples
-
----
 
 ### [Configuration Guide](CONFIGURATION.md)
-**Audience**: End users, developers  
-**Purpose**: Setup and tune `moves` for your environment
 
-**Contains**:
-- Basic configuration (model, API key)
-- 4 recommended LLM providers with setup steps:
-  - Google Gemini (free, recommended)
-  - OpenAI (paid)
-  - Anthropic Claude (paid)
-  - Others (Hugging Face, Groq, etc.)
-- API key security and storage
+**Audience**: All users
+
+Setup and tuning:
+- LLM provider setup (Gemini, OpenAI, Anthropic, others)
+- API key security (Windows Credential Manager, keyring)
 - Configuration file locations
-- Performance tuning parameters
-- Advanced settings
+- Performance tuning parameters (similarity, VAD, chunking)
+- Advanced settings and customization
 - Troubleshooting configuration issues
-- Configuration examples
-
-**Read if**: You need to set up LLM, configure performance, or troubleshoot configuration
-
-**Key Sections**:
-- LLM Providers (4 detailed guides)
-- API Keys & Security
-- Performance Tuning
-- Troubleshooting
-- Configuration Examples
-
----
 
 ### [Development Guide](DEVELOPMENT.md)
-**Audience**: Developers, contributors  
-**Purpose**: Setup local development environment and contribute code
 
-**Contains**:
-- Project overview for developers
-- Prerequisites and setup steps
-- Project file structure
-- Development environment setup
-- Running tests (current status + how to add tests)
-- Code style guidelines and standards
-- Making changes (step-by-step feature example)
+**Audience**: Contributors
+
+Development setup:
+- Prerequisites and environment setup
+- Project structure walkthrough
+- Code style and standards (type hints, docstrings)
+- Adding new features (example: new similarity unit)
+- Testing approach
 - Debugging techniques
-- Building and publishing
-- Common development tasks
-- Git workflow
-- Troubleshooting development issues
-
-**Read if**: You want to contribute code or set up development environment
-
-**Includes**:
-- Example: Adding a new similarity unit (complete walkthrough)
-- Testing best practices
-- Code style examples
-- Publication process
+- Building and publishing to PyPI
+- Git workflow and contribution guidelines
 
 ---
 
 ## Reading Paths
 
-### Path 1: First-Time User
+### First-Time User
 ```
-README.md (5 min)
-  ↓
-Getting Started Guide (30 min)
-  ↓
-Configuration Guide → LLM setup section (10 min)
-  ↓
-Ready to use!
+README.md → Getting Started Guide → Configuration Guide (LLM setup)
 ```
 
-### Path 2: Experienced User (Quick Setup)
+### Quick Setup
 ```
-README.md Quick Start section (5 min)
-  ↓
-CLI Reference for specific commands (as needed)
-  ↓
-Ready to use!
+README.md (Quick Start section) → CLI Reference (as needed)
 ```
 
-### Path 3: Troubleshooting
+### Troubleshooting
 ```
-README.md → Common Issues (2 min)
-  ↓
-Getting Started Guide → Troubleshooting section (10 min)
-  ↓
-Configuration Guide → Troubleshooting section (10 min)
-  ↓
-Issue resolved!
+README.md (Common Issues) → Getting Started (Troubleshooting) → Configuration (Troubleshooting)
 ```
 
-### Path 4: Developer (Contributing)
+### Developer/Contributor
 ```
-README.md (5 min)
-  ↓
-Architecture Guide (30 min)
-  ↓
-Development Guide (20 min)
-  ↓
-Make your changes
-  ↓
-Submit PR!
+README.md → Architecture Guide → Development Guide → Submit PR
 ```
 
-### Path 5: Advanced User (Performance Tuning)
+### Performance Tuning
 ```
-Architecture Guide → Core Components (15 min)
-  ↓
-Configuration Guide → Performance Tuning (10 min)
-  ↓
-Edit config.py and test
+Architecture Guide (Core Components) → Configuration Guide (Performance Tuning)
 ```
 
 ---
 
-## Documentation Statistics
+## Key Topics
 
-| Document | Lines | Sections | Audience |
-|----------|-------|----------|----------|
-| README.md | ~199 | 12 | Everyone |
-| GETTING_STARTED.md | ~700 | 8 + FAQ | End Users |
-| ARCHITECTURE.md | ~600 | 12 | Developers |
-| CLI_REFERENCE.md | ~500 | 15 | Users/Devs |
-| CONFIGURATION.md | ~550 | 8 | Users/Devs |
-| DEVELOPMENT.md | ~600 | 10 | Developers |
-| **TOTAL** | **~3,150** | **65+** | **All** |
+### For Users
+- ✓ Installation (uv and pip methods)
+- ✓ Speaker profile management (add, edit, list, show, delete)
+- ✓ Preparation (automatic with LLM, manual without)
+- ✓ Presentation controls (keyboard shortcuts, states)
+- ✓ Multi-format support (PDF, DOCX, PPTX, TXT)
+- ✓ Google Drive integration
+- ✓ Troubleshooting
 
----
+### For Configuration
+- ✓ LLM providers (Gemini, OpenAI, Anthropic, Groq, etc.)
+- ✓ API key management (secure storage via keyring)
+- ✓ Similarity tuning (weights, thresholds)
+- ✓ VAD tuning (sensitivity, silence detection)
+- ✓ Chunk configuration (window size, candidate range)
 
-## Topics Covered
-
-### General Topics
-- ✓ Installation (multiple methods)
-- ✓ Quick start
-- ✓ Features overview
-- ✓ License information
-
-### User Guidance
-- ✓ Creating speaker profiles
-- ✓ Preparing presentations (auto and manual)
-- ✓ Running presentations
-- ✓ Managing multiple speakers
-- ✓ Keyboard shortcuts
-- ✓ Troubleshooting (user perspective)
-
-### Configuration
-- ✓ LLM provider setup (4 providers)
-- ✓ API key management and security
-- ✓ Configuration file locations
-- ✓ Performance tuning
-- ✓ Advanced settings
-
-### Technical/Architecture
-- ✓ System design and flow
-- ✓ Component descriptions
-- ✓ Data flow diagrams
-- ✓ File organization
-- ✓ Algorithm explanations
-- ✓ Performance considerations
-- ✓ Error handling
-
-### Development
-- ✓ Setup development environment
-- ✓ Code style standards
-- ✓ Adding features (step-by-step example)
-- ✓ Testing
-- ✓ Debugging
+### For Developers
+- ✓ Project structure and file organization
+- ✓ Core components and responsibilities
+- ✓ Data flow and threading model
+- ✓ Code style (Python 3.13+, type hints)
+- ✓ Adding new features
 - ✓ Building and publishing
-- ✓ Git workflow
-
-### Commands
-- ✓ All CLI commands documented
-- ✓ Arguments and options
-- ✓ Real-world examples
-- ✓ Sample output
-- ✓ Error scenarios
-
----
-
-## Key Features of Documentation
-
-### Clarity
-- Clear, plain language for non-technical users
-- Technical depth for developers
-- Consistent terminology
-
-### Completeness
-- Every command documented
-- Every feature explained
-- Every configuration option described
-- FAQ section with 15+ questions
-
-### Examples
-- Quick start example
-- Real-world command examples
-- Code examples (in development guide)
-- Configuration examples (in configuration guide)
-- Feature addition walkthrough
-
-### Organization
-- Logical section structure
-- Table of contents in each doc
-- Clear headings and subheadings
-- Cross-references between documents
-- Consistent formatting
-
-### Diagrams
-- High-level system flow
-- Data flow during preparation
-- Data flow during presentation
-- File organization tree
-
----
-
-## How to Keep Documentation Updated
-
-As the project evolves:
-
-1. **New Commands**: Update CLI_REFERENCE.md and add to README quick start if important
-2. **New Configuration Options**: Update CONFIGURATION.md and config.py defaults
-3. **Architecture Changes**: Update ARCHITECTURE.md data flow diagrams
-4. **New Features**: Update README features list, GETTING_STARTED.md, and relevant guides
-5. **API Changes**: Update CLI_REFERENCE.md immediately
 
 ---
 
 ## Notes
 
-- All documentation is in Markdown format for version control and easy collaboration
-- All file paths use forward slashes for cross-platform compatibility
-- All examples are PowerShell for Windows, but apply to any shell
-- All documentation assumes Python 3.13+
-- All commands assume `moves` is installed and on PATH
+- All documentation uses Markdown format
+- Examples work on Windows, macOS, and Linux
+- Python 3.13+ required
+- Commands assume `moves` is installed and on PATH
 
 ---
 
-## Feedback & Contributions
+## Feedback
 
-Documentation improvements are welcome! If you find:
-- **Unclear explanations** – Open an issue with suggestion
-- **Missing information** – Describe what's needed
-- **Outdated content** – Point out the section
-- **Better examples** – Share them!
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for contribution process.
-
----
-
-**Last Updated**: January 2026  
-**Documentation Version**: Complete  
-**Status**: Ready for users and contributors
+Found an issue? [Open an issue](https://github.com/mdonmez/moves-cli/issues) or see [Development Guide](DEVELOPMENT.md) for contribution process.

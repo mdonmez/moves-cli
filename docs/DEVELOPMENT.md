@@ -1,96 +1,33 @@
 # Development Guide
 
-Guide for contributors and developers who want to work on `moves` locally.
+Guide for contributors and developers working on `moves`.
 
 ## Table of Contents
 
-1. [Getting Started](#getting-started)
-2. [Project Structure](#project-structure)
-3. [Development Setup](#development-setup)
-4. [Running Tests](#running-tests)
-5. [Code Style & Standards](#code-style--standards)
+1. [Prerequisites](#prerequisites)
+2. [Development Setup](#development-setup)
+3. [Project Structure](#project-structure)
+4. [Code Style](#code-style)
+5. [Running Tests](#running-tests)
 6. [Making Changes](#making-changes)
 7. [Debugging](#debugging)
 8. [Building & Publishing](#building--publishing)
-
-## Getting Started
-
-### Prerequisites
-
-- **Python 3.13+** – Required version
-- **uv** – Package manager (or pip)
-- **Git** – For version control
-- **Windows, macOS, or Linux** – Cross-platform
-
-### Understanding the Project
-
-`moves` is a CLI tool written in Python that:
-- Extracts slides from PDFs
-- Analyzes transcripts with LLM
-- Performs real-time speech recognition
-- Matches speech to presentation content
-
-**Key Technologies**:
-- **Typer** – CLI framework
-- **Rich** – Terminal UI
-- **Sherpa-ONNX** – Speech recognition (offline)
-- **FastEmbed** – Semantic embeddings
-- **LiteLLM** – LLM provider abstraction
+9. [Contributing](#contributing)
 
 ---
 
-## Project Structure
+## Prerequisites
 
-```
-moves-cli/
-├── pyproject.toml                    # Project metadata, dependencies
-├── README.md                         # User-facing readme
-├── LICENSE                           # GPL v3
-│
-├── docs/                             # User documentation
-│   ├── GETTING_STARTED.md
-│   ├── ARCHITECTURE.md
-│   ├── CLI_REFERENCE.md
-│   ├── CONFIGURATION.md
-│   └── DEVELOPMENT.md (this file)
-│
-├── src/moves_cli/                    # Main package
-│   ├── __init__.py
-│   ├── cli.py                        # Typer CLI entry point
-│   ├── config.py                     # Configuration constants
-│   ├── models.py                     # Pydantic/dataclass models
-│   │
-│   ├── core/                         # Core business logic
-│   │   ├── presentation_controller.py   # Real-time audio + UI
-│   │   ├── speaker_manager.py           # Speaker lifecycle
-│   │   ├── settings_editor.py           # Settings management
-│   │   │
-│   │   └── components/               # Reusable components
-│   │       ├── chunk_producer.py        # Generate chunks
-│   │       ├── section_producer.py      # Parse markdown
-│   │       ├── similarity_calculator.py # Matching engine
-│   │       │
-│   │       └── similarity_units/     # Similarity algorithms
-│   │           ├── semantic.py
-│   │           └── phonetic.py
-│   │
-│   ├── utils/                        # Utilities
-│   │   ├── data_handler.py           # File I/O
-│   │   ├── formatters.py             # Output formatting
-│   │   ├── text_normalizer.py        # Text processing
-│   │   ├── google_handler.py         # Google Drive
-│   │   ├── model_preparer.py         # Model downloads
-│   │   ├── id_generator.py           # ID generation
-│   │   └── calculate_hash.py         # Hashing
-│   │
-│   └── data/                         # Data files
-│       ├── llm_instruction.md        # LLM prompt
-│       └── ml_models/                # ONNX models (generated)
-│
-└── experiments/                      # Experimental code
-    ├── test_*.py
-    └── calculate_xxhash.py
-```
+### Required
+
+- **Python 3.13+** – Required for type hints and modern syntax
+- **uv** – Package manager (recommended) or pip
+- **Git** – Version control
+
+### Recommended
+
+- **VS Code** or **PyCharm** – IDE with Python support
+- **Microphone** – For testing presentation mode
 
 ---
 
@@ -98,43 +35,244 @@ moves-cli/
 
 ### 1. Clone the Repository
 
-```powershell
+```bash
 git clone https://github.com/mdonmez/moves-cli.git
 cd moves-cli
 ```
 
 ### 2. Create Virtual Environment
 
-Using `uv`:
-```powershell
+**Using uv (recommended):**
+```bash
 uv venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate  # Linux/macOS
+# or
+.\.venv\Scripts\Activate.ps1  # Windows PowerShell
 ```
 
-Or traditional Python:
-```powershell
+**Using standard Python:**
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate
 ```
 
 ### 3. Install in Development Mode
 
-```powershell
-uv pip install -e ".[dev]"
+```bash
+# With uv
+uv pip install -e .
+
+# Or with pip
+pip install -e .
 ```
 
-Or with pip:
-```powershell
-pip install -e ".[dev]"
-```
-
-This installs the package in editable mode, so changes to source code are immediately reflected.
+This installs the package in editable mode – changes to source code take effect immediately.
 
 ### 4. Verify Installation
 
-```powershell
+```bash
 moves --version
 moves --help
+```
+
+---
+
+## Project Structure
+
+```
+moves-cli/
+├── pyproject.toml                # Project metadata, dependencies
+├── README.md                     # User-facing readme
+├── LICENSE                       # GPL v3 license
+├── uv.lock                       # Dependency lock file
+│
+├── docs/                         # Documentation
+│   ├── INDEX.md
+│   ├── GETTING_STARTED.md
+│   ├── ARCHITECTURE.md
+│   ├── CLI_REFERENCE.md
+│   ├── CONFIGURATION.md
+│   └── DEVELOPMENT.md
+│
+├── src/moves_cli/                # Main package
+│   ├── __init__.py
+│   ├── cli.py                    # Typer CLI entry point
+│   ├── config.py                 # Configuration constants
+│   ├── models.py                 # Data models (Section, Chunk, etc.)
+│   │
+│   ├── core/                     # Core business logic
+│   │   ├── presentation_controller.py  # Real-time audio + UI
+│   │   ├── speaker_manager.py          # Speaker lifecycle
+│   │   ├── settings_editor.py          # Settings management
+│   │   │
+│   │   └── components/           # Reusable components
+│   │       ├── chunk_producer.py
+│   │       ├── section_producer.py
+│   │       ├── similarity_calculator.py
+│   │       │
+│   │       └── similarity_units/
+│   │           ├── semantic.py
+│   │           └── phonetic.py
+│   │
+│   ├── utils/                    # Utilities
+│   │   ├── data_handler.py
+│   │   ├── formatters.py
+│   │   ├── text_normalizer.py
+│   │   ├── google_handler.py
+│   │   ├── model_preparer.py
+│   │   ├── id_generator.py
+│   │   └── calculate_hash.py
+│   │
+│   └── data/                     # Data files
+│       ├── llm_instruction.md    # LLM system prompt
+│       └── ml_models/            # ONNX models (generated)
+│
+└── experiments/                  # Experimental scripts
+    └── *.py
+```
+
+---
+
+## Code Style
+
+### Type Hints (Python 3.10+ Style)
+
+Use built-in types, not `typing` module:
+
+```python
+# ✅ Good
+def process(items: list[str], options: dict[str, int]) -> list[Result]:
+    pass
+
+# ❌ Avoid
+from typing import List, Dict
+def process(items: List[str], options: Dict[str, int]) -> List[Result]:
+    pass
+```
+
+Use pipe for unions:
+
+```python
+# ✅ Good
+def get_value(key: str) -> str | None:
+    pass
+
+# ❌ Avoid
+from typing import Optional
+def get_value(key: str) -> Optional[str]:
+    pass
+```
+
+Always annotate return types:
+
+```python
+# ✅ Good
+def setup() -> None:
+    pass
+
+# ❌ Avoid
+def setup():
+    pass
+```
+
+### Dataclasses
+
+Use `@dataclass` for data containers:
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)  # Use frozen for immutability
+class Section:
+    content: str
+    section_index: int
+
+@dataclass
+class Speaker:
+    name: str
+    speaker_id: str
+```
+
+### Enums
+
+Use `StrEnum` for string-based enums:
+
+```python
+from enum import StrEnum
+
+class NormalizationMode(StrEnum):
+    LIVE = "live"
+    PREPROCESS = "preprocess"
+```
+
+### Imports
+
+Sort imports: stdlib, third-party, local:
+
+```python
+# Stdlib
+from dataclasses import dataclass
+from pathlib import Path
+
+# Third-party
+import typer
+from rich.console import Console
+
+# Local
+from moves_cli.config import DATA_FOLDER
+from moves_cli.models import Section
+```
+
+### Docstrings
+
+Google-style for complex functions:
+
+```python
+def generate_chunks(sections: list[Section], window_size: int) -> list[Chunk]:
+    """Generate sliding window chunks from sections.
+    
+    Args:
+        sections: List of presentation sections.
+        window_size: Number of words per chunk.
+    
+    Returns:
+        List of generated chunks for similarity matching.
+    
+    Raises:
+        ValueError: If window_size is less than 1.
+    """
+```
+
+Brief for simple functions:
+
+```python
+def normalize_text(text: str) -> str:
+    """Normalize text by removing diacritics and special characters."""
+```
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Classes | `PascalCase` | `SpeakerManager`, `SimilarityCalculator` |
+| Functions | `snake_case` | `generate_sections`, `_extract_pdf` |
+| Constants | `ALL_CAPS` | `DATA_FOLDER`, `WINDOW_SIZE` |
+| Private | `_leading_underscore` | `_internal_method` |
+| Variables | `snake_case` | `speaker_id`, `section_index` |
+
+### Linting
+
+Use Ruff for linting and formatting:
+
+```bash
+# Check for issues
+uv run ruff check src/
+
+# Auto-fix issues
+uv run ruff check --fix src/
+
+# Format code
+uv run ruff format src/
 ```
 
 ---
@@ -143,152 +281,103 @@ moves --help
 
 ### Current Status
 
-The codebase includes experimental test files in `experiments/` but no formal test suite yet. 
+The project uses experimental scripts in `experiments/` rather than a formal test suite.
 
-**Recommended**: Add pytest tests as you add features.
+### Running Experiments
 
-### Experiment Scripts
-
-Quick test scripts available:
-
-```powershell
-python experiments/test_renderer_results.py
-python experiments/test_mistune_renderer.py
-python experiments/calculate_xxhash.py
+```bash
+uv run python experiments/test_renderer_results.py
+uv run python experiments/test_mistune_renderer.py
 ```
-
-These demonstrate various components but are not comprehensive tests.
 
 ### Adding Tests
 
-Create a `tests/` directory with pytest tests:
+Create `tests/` directory with pytest:
 
-```powershell
+```bash
 mkdir tests
 ```
 
-Example test file (`tests/test_similarity.py`):
+Example test (`tests/test_similarity.py`):
 
 ```python
 import pytest
 from moves_cli.core.components.similarity_calculator import SimilarityCalculator
 from moves_cli.models import Chunk, Section
 
-def test_similarity_basic():
-    """Test basic similarity calculation."""
-    section = Section(content="hello world", section_index=0)
+
+def test_similarity_exact_match():
+    """Test similarity with exact matching content."""
+    section = Section(content="hello world test", section_index=1)
     chunk = Chunk(
-        partial_content="hello world",
+        partial_content="hello world test",
         source_sections=(section,),
         chunk_id="test-1"
     )
     
     calculator = SimilarityCalculator([chunk])
-    results = calculator.compare("hello world", [chunk])
+    results = calculator.compare("hello world test", [chunk], current_section_index=1)
     
-    assert len(results) > 0
-    assert results[0].score > 0.8  # Should be high similarity
+    assert len(results) == 1
+    assert results[0].score > 0.8
+
+
+def test_similarity_empty_input():
+    """Test similarity with empty input."""
+    calculator = SimilarityCalculator([])
+    results = calculator.compare("", [])
+    
+    assert results == []
 ```
 
 Run tests:
-```powershell
-uv run pytest tests/
-```
 
----
-
-## Code Style & Standards
-
-### Style Guidelines
-
-The project follows modern Python best practices (see your custom instructions):
-
-**Type Hints**:
-- Use built-in types: `list[int]`, `dict[str, int]` (not `List`, `Dict`)
-- Use pipe unions: `int | None` (not `Optional[int]`)
-- Always annotate return types: `-> None`
-
-**Example**:
-```python
-def process_sections(
-    sections: list[Section],
-    window_size: int,
-) -> list[Chunk]:
-    """Process sections into chunks.
-    
-    Args:
-        sections: List of presentation sections
-        window_size: Words per chunk
-    
-    Returns:
-        List of generated chunks
-    """
-    ...
-```
-
-**Imports**:
-- Sort imports (alphabet order)
-- Separate: builtins, third-party, local imports
-- Use `from pathlib import Path` (not `os.path`)
-
-**Docstrings**:
-- Use Google-style for complex functions/classes
-- Brief one-liner for simple functions
-
-**Code Organization**:
-- Constants at top: `MY_CONST = 42`
-- Public functions before private (`_private`)
-- Classes with `@dataclass` when appropriate
-
-### Linting
-
-Using Ruff for linting:
-
-```powershell
-uv run ruff check src/
-uv run ruff format src/
+```bash
+uv run pytest tests/ -v
 ```
 
 ---
 
 ## Making Changes
 
-### Adding a New Feature
-
-Example: Add a new similarity unit.
+### Example: Adding a New Similarity Unit
 
 #### 1. Create the Module
 
 Create `src/moves_cli/core/components/similarity_units/lexical.py`:
 
 ```python
-"""Lexical similarity matching using token-based comparison."""
+"""Lexical similarity using token overlap."""
 
 from moves_cli.models import Chunk, SimilarityResult
 
 
 class Lexical:
-    """Compare chunks using lexical/token similarity."""
+    """Token-based similarity comparison."""
     
-    def __init__(self, all_chunks: list[Chunk]):
-        self.all_chunks = all_chunks
+    def __init__(self, all_chunks: list[Chunk]) -> None:
+        """Initialize with all chunks for potential pre-computation."""
+        self._chunks = all_chunks
     
     def compare(
         self,
         input_str: str,
         candidates: list[Chunk],
     ) -> list[SimilarityResult]:
-        """Compare input to candidates using lexical matching.
+        """Compare input to candidates using token overlap (Jaccard).
         
         Args:
-            input_str: Input text to match
-            candidates: Chunks to compare against
+            input_str: Input text to match.
+            candidates: Chunks to compare against.
         
         Returns:
-            Sorted list of similarity results
+            Sorted list of similarity results.
         """
-        results = []
+        if not candidates:
+            return []
+        
         input_tokens = set(input_str.lower().split())
+        results = []
         
         for chunk in candidates:
             chunk_tokens = set(chunk.partial_content.lower().split())
@@ -301,7 +390,7 @@ class Lexical:
         return sorted(results, key=lambda x: -x.score)
 ```
 
-#### 2. Integrate into Similarity Calculator
+#### 2. Integrate into Calculator
 
 Edit `src/moves_cli/core/components/similarity_calculator.py`:
 
@@ -316,53 +405,52 @@ class SimilarityCalculator:
         phonetic_weight: float = PHONETIC_WEIGHT,
         lexical_weight: float = 0.0,  # New parameter
     ):
-        self.semantic_weight = semantic_weight
-        self.phonetic_weight = phonetic_weight
-        self.lexical_weight = lexical_weight
-        self.semantic = Semantic(all_chunks)
-        self.phonetic = Phonetic(all_chunks)
-        self.lexical = Lexical(all_chunks)  # New
-        # ... rest of init
+        # ... existing code ...
+        self.lexical = Lexical(all_chunks)  # Add this
 ```
 
-#### 3. Add Tests
+#### 3. Add Configuration
 
-Create `tests/test_lexical_similarity.py`:
+Edit `src/moves_cli/config.py`:
 
 ```python
-import pytest
+LEXICAL_WEIGHT = 0.0  # New config option
+```
+
+#### 4. Add Tests
+
+Create `tests/test_lexical.py`:
+
+```python
 from moves_cli.core.components.similarity_units.lexical import Lexical
 from moves_cli.models import Chunk, Section
 
 
 def test_lexical_exact_match():
-    """Test lexical similarity with exact match."""
-    section = Section(content="hello world test", section_index=0)
-    chunk = Chunk(
-        partial_content="hello world test",
-        source_sections=(section,),
-        chunk_id="test-1"
-    )
+    section = Section(content="test", section_index=1)
+    chunk = Chunk(partial_content="hello world", source_sections=(section,), chunk_id="1")
     
     lexical = Lexical([chunk])
-    results = lexical.compare("hello world test", [chunk])
+    results = lexical.compare("hello world", [chunk])
     
     assert results[0].score == 1.0
-```
 
-#### 4. Update Config if Needed
 
-If adding configurable parameters, add to `src/moves_cli/config.py`:
-
-```python
-LEXICAL_WEIGHT = 0.0  # New weight parameter
+def test_lexical_partial_match():
+    section = Section(content="test", section_index=1)
+    chunk = Chunk(partial_content="hello world", source_sections=(section,), chunk_id="1")
+    
+    lexical = Lexical([chunk])
+    results = lexical.compare("hello there", [chunk])
+    
+    # Jaccard: {"hello"} ∩ {"hello", "world"} / {"hello", "there", "world"} = 1/3
+    assert 0.3 < results[0].score < 0.4
 ```
 
 #### 5. Update Documentation
 
-Add to [ARCHITECTURE.md](ARCHITECTURE.md) under "Similarity Calculator":
-
-> **Lexical Similarity** – Token-based matching for exact word overlap
+Add to [ARCHITECTURE.md](ARCHITECTURE.md):
+> **Lexical Similarity** – Token overlap using Jaccard index
 
 ---
 
@@ -370,56 +458,38 @@ Add to [ARCHITECTURE.md](ARCHITECTURE.md) under "Similarity Calculator":
 
 ### Print Debugging
 
+Use the output formatter:
+
 ```python
 from moves_cli.utils.formatters import output
 import typer
 
-# Simple output
-typer.echo(output(f"Debug: {value}"))
-
-# Formatted table
-typer.echo(output("Processing", {"status": "running", "progress": "50%"}))
-```
-
-### Logging
-
-Use `loguru` for structured logging:
-
-```python
-from loguru import logger
-
-logger.info("Starting speaker preparation")
-logger.debug(f"Processing section {i}")
-logger.error("Failed to download model", exc_info=True)
+typer.echo(output("Debug message", {"key": "value"}))
 ```
 
 ### Interactive Debugging
 
-Using Python debugger:
+Python debugger:
 
-```powershell
-# Add breakpoint
-uv run python -m pdb src/moves_cli/cli.py
+```bash
+uv run python -m pdb -c continue src/moves_cli/cli.py speaker list
 ```
 
-Or use an IDE debugger (VS Code, PyCharm, etc.).
+Or use VS Code / PyCharm debugger.
 
 ### Testing Individual Components
 
-Quick test of similarity calculator:
-
 ```python
+# In Python REPL
 from moves_cli.models import Section, Chunk
-from moves_cli.core.components.similarity_calculator import SimilarityCalculator
+from moves_cli.core.components.chunk_producer import generate_chunks
 
-# Create test data
-section = Section(content="hello world", section_index=0)
-chunk = Chunk(partial_content="hello world", source_sections=(section,), chunk_id="1")
-
-# Test similarity
-calc = SimilarityCalculator([chunk])
-results = calc.compare("hello world", [chunk])
-print(results[0].score)
+sections = [
+    Section(content="hello world", section_index=1),
+    Section(content="foo bar baz", section_index=2),
+]
+chunks = generate_chunks(sections, window_size=3)
+print(f"Generated {len(chunks)} chunks")
 ```
 
 ---
@@ -428,205 +498,146 @@ print(results[0].score)
 
 ### Local Build
 
-Build the wheel locally:
-
-```powershell
+```bash
 uv build
 ```
 
 Produces:
-- `dist/moves_cli-*.whl` – Installable wheel
+- `dist/moves_cli-*.whl` – Wheel package
 - `dist/moves_cli-*.tar.gz` – Source archive
 
-### Installing Local Build
+### Install Local Build
 
-```powershell
+```bash
 uv tool install dist/moves_cli-*.whl
+```
+
+### Version Update
+
+Edit `pyproject.toml`:
+
+```toml
+[project]
+version = "0.3.4"  # Update this
 ```
 
 ### Publishing to PyPI
 
-**Prerequisites**:
-- PyPI account
-- API token from PyPI
-
-**Process**:
-
-1. Update version in `pyproject.toml`:
-   ```toml
-   version = "0.3.3"
-   ```
-
-2. Build:
-   ```powershell
+1. Build:
+   ```bash
    uv build
    ```
 
-3. Publish:
-   ```powershell
+2. Publish:
+   ```bash
    uv publish
    ```
 
-(Or use `twine`: `twine upload dist/*`)
+Or use twine:
+```bash
+pip install twine
+twine upload dist/*
+```
 
 ---
 
-## Common Development Tasks
+## Contributing
+
+### Workflow
+
+1. **Fork** the repository
+2. **Create** a feature branch:
+   ```bash
+   git checkout -b feature/my-feature
+   ```
+3. **Make changes** with clear commits
+4. **Add tests** for new functionality
+5. **Update docs** as needed
+6. **Run linting**:
+   ```bash
+   uv run ruff check src/
+   uv run ruff format src/
+   ```
+7. **Submit PR** with description
+
+### Commit Messages
+
+Use clear, descriptive messages:
+
+```
+Add: lexical similarity unit for token matching
+Fix: VAD threshold not being applied correctly
+Update: documentation for new CLI options
+Refactor: extract audio processing into separate module
+```
+
+### Code Review
+
+Expect feedback on:
+- Correctness and edge cases
+- Code style consistency
+- Test coverage
+- Documentation updates
+- Performance implications
+
+### Areas for Contribution
+
+- **New similarity algorithms** – `similarity_units/`
+- **New document formats** – `section_producer.py`
+- **UI improvements** – `presentation_controller.py`
+- **Performance optimizations** – Profiling and caching
+- **Documentation** – Examples, tutorials, translations
+- **Tests** – Unit and integration tests
+
+---
+
+## Common Tasks
 
 ### Add a New CLI Command
 
-Edit `src/moves_cli/cli.py`:
-
 ```python
+# In cli.py
 @app.command()
 def export(
     speaker: str = typer.Argument(..., help="Speaker to export"),
-    output: str = typer.Option("output.md", help="Output file"),
+    output: Path = typer.Option("output.md", help="Output file"),
 ):
-    """Export speaker sections as markdown."""
-    typer.echo(f"Exporting {speaker} to {output}")
-    # Implementation...
+    """Export speaker sections to file."""
+    # Implementation
 ```
 
-### Modify Configuration Constants
+### Add a Dependency
 
-Edit `src/moves_cli/config.py`:
+```bash
+uv add package-name
 
-```python
-# Adjust thresholds
-SIMILARITY_THRESHOLD = 0.75  # Was 0.7
-WINDOW_SIZE = 15            # Was 12
-```
-
-Restart after changing:
-```powershell
-moves --help
+# Dev dependency
+uv add -d pytest
 ```
 
 ### Update LLM Prompt
 
-Edit `src/moves_cli/data/llm_instruction.md` to change how sections are generated.
+Edit `src/moves_cli/data/llm_instruction.md` and rebuild.
 
-### Add New Dependency
+### Modify Configuration
 
-```powershell
-uv add package-name
-```
+Edit `src/moves_cli/config.py`:
 
-Or for dev-only:
-```powershell
-uv add -d pytest
-```
-
-This updates `pyproject.toml` automatically.
-
-### Run a Single Experiment
-
-```powershell
-uv run experiments/test_renderer_results.py
+```python
+WINDOW_SIZE = 15  # Changed from 12
 ```
 
 ---
 
-## Troubleshooting Development
-
-### Import Errors
-
-Make sure you're using editable install:
-```powershell
-uv pip install -e .
-```
-
-### Model Download Issues
-
-Delete model cache and let it re-download:
-```powershell
-rm -r $env:USERPROFILE\.moves\ml_models
-moves speaker prepare MyTalk  # Re-downloads models
-```
-
-### Virtual Environment Issues
-
-Recreate environment:
-```powershell
-rm -r .venv
-uv venv
-.\.venv\Scripts\Activate.ps1
-uv pip install -e .
-```
-
-### Dependency Conflicts
-
-Check installed versions:
-```powershell
-uv pip list | grep moves
-```
-
-Sync with lock file:
-```powershell
-uv sync
-```
-
----
-
-## Git Workflow
-
-### Cloning for Development
-
-```powershell
-git clone https://github.com/mdonmez/moves-cli.git
-cd moves-cli
-```
-
-### Creating a Feature Branch
-
-```powershell
-git checkout -b feature/my-new-feature
-```
-
-### Committing Changes
-
-```powershell
-git add src/moves_cli/my_file.py
-git commit -m "Add: new similarity feature"
-```
-
-### Pushing Changes
-
-```powershell
-git push origin feature/my-new-feature
-```
-
-Then open a Pull Request on GitHub.
-
----
-
-## Additional Resources
+## Resources
 
 - [Architecture Guide](ARCHITECTURE.md) – System design
-- [Configuration Guide](CONFIGURATION.md) – Settings options
-- [LiteLLM Docs](https://docs.litellm.ai/) – LLM provider details
+- [CLI Reference](CLI_REFERENCE.md) – Command documentation
+- [LiteLLM Docs](https://docs.litellm.ai/) – LLM provider reference
 - [Typer Docs](https://typer.tiangolo.com/) – CLI framework
 - [Rich Docs](https://rich.readthedocs.io/) – Terminal UI
-- [Pydantic Docs](https://docs.pydantic.dev/) – Data validation
+- [Sherpa-ONNX](https://k2-fsa.github.io/sherpa/onnx/) – Speech recognition
 
 ---
 
-## Contribution Guidelines
-
-1. **Fork** the repository
-2. **Create** a feature branch
-3. **Make changes** with clear commits
-4. **Add tests** for new functionality
-5. **Update docs** as needed
-6. **Submit PR** with description
-
-**Code Review**: Expect feedback on:
-- Correctness and robustness
-- Code style and clarity
-- Test coverage
-- Documentation completeness
-
----
-
-Thank you for contributing to `moves`! Questions? Open an issue on GitHub.
+Questions? [Open an issue](https://github.com/mdonmez/moves-cli/issues).

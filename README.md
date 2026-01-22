@@ -12,30 +12,37 @@
 
 ### Key Features
 
-- **Offline speech recognition** – Uses local ONNX models; your voice stays on your machine
-- **Hybrid similarity engine** – Combines semantic and phonetic matching for accurate slide detection
-- **Automatic slide generation** – Extracts slides from PDF presentations and generates templates with LLM assistance (optional manual mode)
+- **Offline speech recognition** – Uses Sherpa-ONNX with NeMo Streaming Fast Conformer models; your voice stays on your machine
+- **Hybrid similarity engine** – Combines semantic embeddings (all-MiniLM-L6-v2) and phonetic matching (Metaphone + RapidFuzz) for accurate slide detection
+- **Multi-format support** – Extracts content from PDF, DOCX, PPTX, and TXT files using 100% free, open-source libraries
+- **Automatic section generation** – Uses LLM (via LiteLLM) to analyze transcript and generate speech content for each slide
+- **Manual mode** – Generate empty templates to fill in yourself, no LLM required
 - **Speaker profiles** – Save and reuse multiple presentations with different speakers
-- **Flexible source handling** – Load presentations and transcripts from local files or Google Drive
-- **Interactive terminal UI** – Real-time feedback with Rich-powered dashboard showing current slide, similarity scores, and system state
+- **Google Drive integration** – Load presentations and transcripts directly from Google Drive URLs
+- **Interactive terminal UI** – Real-time Rich-powered dashboard showing current slide, similarity scores, VAD status, and recognized speech
+- **Voice Activity Detection** – Silero VAD filters silence and background noise for better recognition
 
-## What It Does
+## How It Works
 
-1. **Prepare** – Extract slides from a PDF, analyze your transcript, generate sections with speech content
-2. **Control** – Start live voice-controlled navigation with keyboard backups
-3. **Manage** – Add, edit, list, and delete speaker profiles
+1. **Prepare** – Extract slides from your presentation, analyze your transcript, generate speech content for each slide
+2. **Control** – Start live voice-controlled navigation with real-time speech matching
+3. **Manage** – Add, edit, list, show, and delete speaker profiles
 
 ## Installation
 
 ### Requirements
 - Python 3.13+
-- `uv` package manager (or pip as fallback)
+- `uv` package manager (recommended) or pip
+- Microphone for presentation mode
 
 ### Install from PyPI
 
 ```bash
+# Using uv (recommended)
 uv tool install moves-cli
-# or: pip install moves-cli
+
+# Or using pip
+pip install moves-cli
 
 # Verify installation
 moves --version
@@ -46,14 +53,10 @@ moves --version
 ### 1. Add a Speaker Profile
 
 ```bash
-moves speaker add MyPresentation \
-  /path/to/presentation.pdf \
-  /path/to/transcript.txt
-```
+# Using local files (PDF, DOCX, PPTX, or TXT supported)
+moves speaker add MyPresentation /path/to/presentation.pdf /path/to/transcript.txt
 
-You can also use Google Drive URLs (the tool handles authentication):
-
-```bash
+# Or using Google Drive URLs
 moves speaker add MyPresentation \
   "https://drive.google.com/file/d/.../view?usp=sharing" \
   "https://drive.google.com/file/d/.../view?usp=sharing"
@@ -62,28 +65,28 @@ moves speaker add MyPresentation \
 ### 2. Configure LLM (for automatic section generation)
 
 ```bash
-# Set your LLM model (e.g., Gemini 2.5 Flash)
+# Set your LLM model (Gemini is free and recommended)
 moves settings set model gemini/gemini-2.5-flash-lite
 
-# Set your API key (securely prompted)
+# Set your API key (input is hidden for security)
 moves settings set key
 ```
 
-> **Tip**: You can skip LLM setup and use `--manual` mode to generate empty templates you edit yourself.
+Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+> **Tip**: Skip LLM setup entirely with `--manual` mode to generate empty templates you edit yourself.
 
 ### 3. Prepare the Speaker
 
-Generate sections (speech content for each slide):
-
 ```bash
-# Auto mode (uses LLM)
+# Auto mode (uses LLM to generate speech content)
 moves speaker prepare MyPresentation
 
-# Or manual mode (empty template to edit yourself)
+# Manual mode (creates empty template - no LLM needed)
 moves speaker prepare MyPresentation --manual
 ```
 
-Edit `~/.moves/speakers/<speaker-id>/sections.md` to add your spoken words for each slide if using manual mode.
+If using manual mode, edit `~/.moves/speakers/<speaker-id>/sections.md` to add your speech content for each slide.
 
 ### 4. Start Presentation Control
 
@@ -92,98 +95,162 @@ moves present MyPresentation
 ```
 
 **Keyboard shortcuts during presentation:**
-- `←` / `→` – Previous / Next slide (manual navigation)
-- `Ins` – Pause/Resume microphone
-- `Ctrl+C` – Exit
 
-The tool listens to your speech and automatically advances slides when it detects you've moved to new content.
+| Key | Action |
+|-----|--------|
+| `←` / `→` | Previous / Next slide |
+| `M` | Pause/Resume microphone |
+| `Q` | Quit presentation |
+| `Ctrl+C` | Force exit |
+
+The system listens to your speech and automatically advances slides when it detects content matching the next section.
+
+### Presentation States
+
+- **ACTIVE** – Listening and auto-navigating based on speech
+- **PAUSED** – Microphone muted, keyboard navigation still works
+- **LOCKED** – Manual navigation detected, auto-advance disabled until consensus
 
 ## Documentation
 
 - **[Getting Started Guide](docs/GETTING_STARTED.md)** – Detailed walkthrough with examples
 - **[Architecture](docs/ARCHITECTURE.md)** – How the system works internally
 - **[CLI Reference](docs/CLI_REFERENCE.md)** – Complete command documentation
-- **[Configuration Guide](docs/CONFIGURATION.md)** – Setup LLM, API keys, and more
+- **[Configuration Guide](docs/CONFIGURATION.md)** – Setup LLM, API keys, and tuning
 - **[Development Guide](docs/DEVELOPMENT.md)** – For contributors and developers
+- **[Documentation Index](docs/INDEX.md)** – Navigate all documentation
 
-## How It Works
+## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ 1. PREPARATION PHASE                                    │
+│ PREPARATION PHASE                                       │
 ├─────────────────────────────────────────────────────────┤
-│ • Extract slides from PDF                               │
-│ • Analyze transcript to identify sections               │
-│ • Generate speech content for each slide (LLM or manual)│
-│ • Create sections.md file with structure                │
+│ • Extract content from presentation (PDF/DOCX/PPTX/TXT) │
+│ • Parse transcript text                                 │
+│ • Generate speech content per slide (LLM or manual)     │
+│ • Create sections.md with slide-speech mapping          │
+│ • Compute file hashes for change detection              │
 └─────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 2. PRESENTATION PHASE                                   │
+│ PRESENTATION PHASE                                      │
 ├─────────────────────────────────────────────────────────┤
-│ • Start microphone stream (real-time audio input)       │
-│ • Voice Activity Detector (VAD) filters silence         │
-│ • Speech Recognition converts audio to text (offline)   │
-│ • Similarity Engine matches text to chunks              │
-│   ├─ Semantic similarity (embeddings)                   │
-│   └─ Phonetic similarity (fuzzy matching)               │
-│ • Auto-advance when high similarity match detected      │
+│ • Microphone stream → Voice Activity Detection (VAD)    │
+│ • VAD filters silence → Speech-to-Text (offline STT)    │
+│ • Text normalization → Sliding window buffer            │
+│ • Hybrid similarity matching:                           │
+│   ├─ Semantic: all-MiniLM-L6-v2 embeddings (60%)       │
+│   └─ Phonetic: Metaphone + fuzzy matching (40%)        │
+│ • Auto-advance when similarity ≥ 70% threshold          │
+│ • Rich terminal UI with real-time feedback              │
 └─────────────────────────────────────────────────────────┘
 ```
 
+## Supported File Formats
+
+All formats use **100% free, open-source libraries** – no commercial licenses required:
+
+| Format | Library | Notes |
+|--------|---------|-------|
+| **PDF** | PyMuPDF4LLM | LLM-optimized markdown extraction |
+| **DOCX** | python-docx | Microsoft Word documents |
+| **PPTX** | python-pptx | PowerPoint presentations |
+| **TXT** | Native | Plain text files |
+
 ## Data Storage
 
-All speaker data is stored in `~/.moves/`:
+All data is stored in `~/.moves/`:
 
 ```
 ~/.moves/
-├── settings.toml          # LLM model configuration
-├── settings.key           # API key (Windows Credential Manager)
+├── settings.toml              # LLM model configuration
+├── ml_models/                 # Downloaded ONNX models (~500MB)
+│   ├── all-MiniLM-L6-v2_quint8_avx2/    # Embedding model
+│   ├── nemo-streaming-stt-480ms-int8/    # STT model
+│   └── silero-vad-int8/                  # VAD model
 └── speakers/
     └── <speaker-id>/
-        ├── speaker.yaml   # Speaker metadata
-        └── sections.md    # Speech content for each slide
+        ├── speaker.yaml       # Speaker metadata and hashes
+        └── sections.md        # Speech content for each slide
 ```
+
+API keys are stored securely in the system keyring (Windows Credential Manager / macOS Keychain / Linux Secret Service).
 
 ## Common Issues & Solutions
 
-**No speakers found?**
+### No speakers found
 ```bash
 moves speaker list
-# Check ~/.moves/speakers/ directory exists
+# If empty, create a speaker:
+moves speaker add MyTalk presentation.pdf transcript.txt
 ```
 
-**Sections not being created?**
+### LLM configuration error
 ```bash
-# Check LLM configuration
+# Check current settings
 moves settings list
 
-# Try manual mode (no LLM required)
-moves speaker prepare MyPresentation --manual
+# Use manual mode (no LLM required)
+moves speaker prepare MyTalk --manual
 ```
 
-**Microphone not detected?**
+### Speech not being recognized
+- Speak clearly at a normal pace
+- Ensure `sections.md` contains the expected speech content
+- Check microphone in system settings
+- Try a quieter environment
+
+### Source files changed warning
+The tool detects when your presentation or transcript files have changed since last preparation. Re-prepare to update:
 ```bash
-# Verify your system microphone works:
-# Settings → Sound → Volume mixer (Windows)
-# Then retry: moves present MyPresentation
+moves speaker prepare MyTalk
 ```
 
-**Speech not being recognized?**
-- Speak clearly and at a normal pace
-- Test microphone in a quiet environment
-- Check that sections.md contains expected content
+## Performance Characteristics
 
-## Performance Notes
+| Aspect | Details |
+|--------|---------|
+| **Audio Processing** | ~32ms analysis windows (VAD_WINDOW_SIZE: 512 samples at 16kHz) |
+| **Similarity Threshold** | 70% combined score triggers auto-advance |
+| **Chunk Window** | 12 words per matching chunk |
+| **Models Download** | ~500MB one-time download on first use |
+| **Memory Usage** | ~200-300MB during presentation |
+| **Offline Capable** | Fully offline after models are downloaded (except LLM preparation) |
 
-- **Offline processing** – No cloud calls except for LLM section generation
-- **Real-time audio** – ~32ms analysis windows, responsive slide detection
-- **Memory efficient** – Processed sections cached in `sections.md`
-- **First run slower** – ONNX models (~500MB) downloaded on first use
+## Configuration Options
+
+Key tuning parameters in `config.py`:
+
+```python
+SEMANTIC_WEIGHT = 0.6          # Semantic vs phonetic balance
+PHONETIC_WEIGHT = 0.4
+SIMILARITY_THRESHOLD = 0.7     # Minimum score to auto-advance
+WINDOW_SIZE = 12               # Words per matching chunk
+
+VAD_THRESHOLD = 0.35           # Voice activity sensitivity
+VAD_MIN_SILENCE = 0.5          # Seconds of silence to end speech
+VAD_MIN_SPEECH = 0.1           # Minimum speech duration to detect
+```
+
+See [Configuration Guide](docs/CONFIGURATION.md) for detailed tuning instructions.
+
+## Supported LLM Providers
+
+Via [LiteLLM](https://docs.litellm.ai/), moves supports 100+ LLM providers:
+
+| Provider | Model Example | Cost |
+|----------|--------------|------|
+| **Google Gemini** | `gemini/gemini-2.5-flash-lite` | Free tier available |
+| **OpenAI** | `gpt-4o-mini` | Pay-as-you-go |
+| **Anthropic** | `claude-3-5-sonnet` | Pay-as-you-go |
+| **Groq** | `groq/mixtral-8x7b-32768` | Free tier available |
+
+See [Configuration Guide](docs/CONFIGURATION.md#llm-providers) for setup instructions.
 
 ## Project Status
 
-**Active Development** – This tool is being actively developed and improved. Feedback and contributions are welcome.
+**Active Development** – This tool is being actively developed. Feedback and contributions are welcome!
 
 ## License
 
@@ -195,4 +262,4 @@ Contributions are welcome! See [Development Guide](docs/DEVELOPMENT.md) for setu
 
 ---
 
-**Questions?** Check the [FAQ in Getting Started](docs/GETTING_STARTED.md#frequently-asked-questions) or open an issue on GitHub.
+**Questions?** Check the [FAQ](docs/GETTING_STARTED.md#frequently-asked-questions) or [open an issue](https://github.com/mdonmez/moves-cli/issues).

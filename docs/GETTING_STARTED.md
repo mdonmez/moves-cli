@@ -1,11 +1,11 @@
 # Getting Started Guide
 
-This guide walks you through using `moves` from installation to giving your first hands-free presentation.
+Step-by-step guide to using `moves` for hands-free presentation control.
 
 ## Table of Contents
 
 1. [Installation](#installation)
-2. [Initial Setup](#initial-setup)
+2. [Understanding the Data Directory](#understanding-the-data-directory)
 3. [Creating Your First Speaker](#creating-your-first-speaker)
 4. [Preparing for Presentation](#preparing-for-presentation)
 5. [Giving a Presentation](#giving-a-presentation)
@@ -15,497 +15,603 @@ This guide walks you through using `moves` from installation to giving your firs
 
 ## Installation
 
-### Step 1: Install Python
+### Step 1: Install Python 3.13+
 
 `moves` requires Python 3.13 or newer.
 
-**On Windows:**
+**Windows:**
 1. Download from [python.org](https://www.python.org/downloads/)
-2. Run installer, check "Add Python to PATH"
-3. Verify: Open PowerShell and type `python --version`
+2. Run installer and check "Add Python to PATH"
+3. Verify: `python --version`
 
-### Step 2: Install `uv` Package Manager
+**macOS/Linux:**
+```bash
+# Using pyenv (recommended)
+pyenv install 3.13
+pyenv global 3.13
 
-```powershell
+# Or using your package manager
+```
+
+### Step 2: Install `uv` Package Manager (Recommended)
+
+```bash
 pip install uv
 ```
 
-Or use your preferred package manager. `uv` is optional; you can also use `pip` directly.
+Or use pip directly if you prefer.
 
-### Step 3: Install `moves`
+### Step 3: Install `moves-cli`
 
-```powershell
+```bash
+# Using uv (recommended)
 uv tool install moves-cli
-```
 
-Or with pip:
-```powershell
+# Or using pip
 pip install moves-cli
 ```
 
 ### Step 4: Verify Installation
 
-```powershell
+```bash
 moves --version
 ```
 
-You should see something like: `moves-cli version 0.3.2`
+Expected output: `moves-cli version 0.3.3`
 
-## Initial Setup
+---
 
-### Understand the Data Directory
+## Understanding the Data Directory
 
-`moves` stores all speaker data in: `C:\Users\<YourUsername>\.moves\`
+All moves data is stored in `~/.moves/`:
 
 ```
 ~/.moves/
-├── settings.toml              # Your LLM configuration
-└── speakers/
+├── settings.toml              # LLM model configuration
+├── ml_models/                 # ONNX models (downloaded on first use)
+│   ├── all-MiniLM-L6-v2_quint8_avx2/   # Semantic embedding model (~90MB)
+│   ├── nemo-streaming-stt-480ms-int8/   # Speech-to-text model (~130MB)
+│   └── silero-vad-int8/                 # Voice activity detection (~2MB)
+└── speakers/                  # Speaker profiles
     └── <speaker-id>/
-        ├── speaker.yaml       # Speaker metadata
-        └── sections.md        # Speech content for slides
+        ├── speaker.yaml       # Metadata and file hashes
+        └── sections.md        # Speech content for each slide
 ```
 
 Check this directory:
-```powershell
-dir $env:USERPROFILE\.moves
+```bash
+# Windows
+dir %USERPROFILE%\.moves
+
+# macOS/Linux
+ls ~/.moves
 ```
+
+---
 
 ## Creating Your First Speaker
 
 ### Gather Your Materials
 
-You'll need:
-1. **Presentation file** – Your slides in PDF, DOCX, PPTX, or TXT format (e.g., `my_talk.pdf`, `my_talk.pptx`)
-2. **Transcript file** – Text file with what you'll say (e.g., `my_talk.txt`)
+You need:
+1. **Presentation file** – PDF, DOCX, PPTX, or TXT format
+2. **Transcript file** – Text file with what you plan to say
 
-**Supported presentation formats:** All formats are **100% free** with no commercial licenses required!
-- **PDF** - Via PyMuPDF4LLM (optimized for LLM processing)
-- **DOCX** - Via python-docx (Microsoft Word documents)
-- **PPTX** - Via python-pptx (PowerPoint presentations)
-- **TXT** - Native text file support
+**Supported formats** (all 100% free, no commercial licenses):
+| Format | Library | Notes |
+|--------|---------|-------|
+| PDF | PyMuPDF4LLM | Optimized for LLM processing |
+| DOCX | python-docx | Microsoft Word documents |
+| PPTX | python-pptx | PowerPoint presentations |
+| TXT | Native | Plain text files |
 
-The transcript should be organized roughly by slide, like:
+### Transcript Format
 
-```
-Slide 1: Hello everyone, thanks for coming today. I'm excited to share this project.
+Your transcript should roughly align with your slides:
 
-Slide 2: This is the overview. We have three main topics to cover...
+```text
+Hello everyone, thanks for coming today. I'm excited to share this project with you.
 
-Slide 3: First topic, diving deeper now...
-```
+This is the overview. We have three main topics to cover: architecture, implementation, and results.
 
-### Create a Speaker Profile
-
-Run:
-```powershell
-moves speaker add MyTalk C:\path\to\my_talk.pdf C:\path\to\my_talk.txt
+First, let's dive into the architecture. The system consists of several key components...
 ```
 
-Replace paths with your actual files. You'll see:
+### Create the Speaker Profile
 
+```bash
+# Using local files
+moves speaker add MyTalk /path/to/presentation.pdf /path/to/transcript.txt
+
+# Using PowerPoint
+moves speaker add MyTalk /path/to/presentation.pptx /path/to/transcript.txt
+
+# Using Word document
+moves speaker add MyTalk /path/to/document.docx /path/to/notes.txt
+```
+
+Output:
 ```
 Speaker MyTalk (a1b2c) has been successfully added.
 
-Data directory:
-  C:\Users\<YourUsername>\.moves\speakers\a1b2c
-
-Presentation source:
-  C:\path\to\my_talk.pdf
-
-Transcript source:
-  C:\path\to\my_talk.txt
+  Data directory: ~/.moves/speakers/a1b2c
+  Presentation source: /path/to/presentation.pdf
+  Transcript source: /path/to/transcript.txt
 ```
 
-**Congratulations!** You've created your first speaker profile.
-
-### Using Google Drive URLs (Optional)
+### Using Google Drive URLs
 
 If your files are on Google Drive:
 
-```powershell
-moves speaker add MyTalk `
-  "https://drive.google.com/file/d/1ABC2DEF3GHI/view?usp=sharing" `
-  "https://drive.google.com/file/d/1JKL2MNO3PQR/view?usp=sharing"
+```bash
+moves speaker add MyTalk \
+  "https://drive.google.com/file/d/ABC123/view?usp=sharing" \
+  "https://drive.google.com/file/d/DEF456/view?usp=sharing"
 ```
 
-The tool will download them automatically and authenticate if needed.
+**Requirements:**
+- Files must be shared ("Anyone with the link can view")
+- Google Docs/Slides are exported as PDF automatically
+
+---
 
 ## Preparing for Presentation
 
 ### Option A: Automatic Preparation (Uses LLM)
 
-This is the easiest method. An LLM analyzes your transcript and generates speech content for each slide.
+The LLM analyzes your transcript and generates speech content for each slide.
 
 #### 1. Configure Your LLM
 
-First, you need to set up an LLM. Here are popular free options:
+**Google Gemini (Free, Recommended):**
+```bash
+# Get free API key from https://aistudio.google.com/app/apikey
+moves settings set model gemini/gemini-2.5-flash-lite
+moves settings set key
+# Paste your API key when prompted (hidden input)
+```
 
-**Using Google Gemini (Recommended for Free):**
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Create a new API key (free tier available)
-3. In `moves`, run:
-   ```powershell
-   moves settings set model gemini/gemini-2.5-flash-lite
-   moves settings set key
-   ```
-4. Paste your API key when prompted (text will be hidden)
+**OpenAI:**
+```bash
+moves settings set model gpt-4o-mini
+moves settings set key
+# Paste your OpenAI API key
+```
 
-**Using OpenAI:**
-1. Create account at [OpenAI](https://platform.openai.com/)
-2. Get API key from account settings
-3. In `moves`, run:
-   ```powershell
-   moves settings set model gpt-4o-mini
-   moves settings set key
-   ```
-
-**Using other providers:** See [Configuration Guide](CONFIGURATION.md) for more options.
+**Verify configuration:**
+```bash
+moves settings list
+```
 
 #### 2. Run Preparation
 
-```powershell
+```bash
 moves speaker prepare MyTalk
 ```
 
-This will:
-- Analyze your PDF slides
-- Process your transcript
-- Use LLM to generate speech content for each slide
-- Create `sections.md` file
+Output:
+```
+Preparing 1 speaker(s).
 
-Progress bar shows processing time. Takes 30-60 seconds typically.
+MyTalk (a1b2c)
+  Presentation: presentation.pdf (15 slides)
+  Transcript: transcript.txt
+  Estimated tokens: ~2,500
+  Estimated cost: ~$0.0001 (gemini/gemini-2.5-flash-lite)
+
+Proceed? [Y/n]: y
+
+Speaker MyTalk (a1b2c) prepared.
+
+  Sections created: 15
+  Processing time: 45.3s
+  Sections file: ~/.moves/speakers/a1b2c/sections.md
+```
 
 ### Option B: Manual Preparation (No LLM)
 
-If you don't want to use an LLM, or prefer full control:
+If you don't want to use an LLM:
 
-```powershell
+```bash
 moves speaker prepare MyTalk --manual
 ```
 
-This creates an empty template. You then manually edit `sections.md`:
+This creates an empty template. Edit the sections file:
 
-```powershell
-# Open the sections file in your editor
-notepad $env:USERPROFILE\.moves\speakers\a1b2c\sections.md
+```bash
+# Windows
+notepad %USERPROFILE%\.moves\speakers\a1b2c\sections.md
+
+# macOS/Linux
+nano ~/.moves/speakers/a1b2c/sections.md
 ```
 
-The file looks like:
-
+The template format:
 ```markdown
-# Slide 1
-Content for slide 1
+# 1. Slide
 
-# Slide 2
-Content for slide 2
+Add speech content here for slide 1...
 
-# Slide 3
-Content for slide 3
+# 2. Slide
+
+Add speech content here for slide 2...
+
+# 3. Slide
+
+Add speech content here for slide 3...
 ```
 
-Add your speech notes for each slide:
-
+Fill in each section with what you'll say during that slide:
 ```markdown
-# Slide 1
-Hello everyone, thanks for coming. I'm excited to share this.
+# 1. Slide
 
-# Slide 2
-This is the overview. Three main topics today.
+Hello everyone, thanks for coming today. I'm excited to share this project with you.
 
-# Slide 3
-First, let me dive deeper into the architecture...
+# 2. Slide
+
+This is the overview. We have three main topics to cover: architecture, implementation, and results.
+
+# 3. Slide
+
+First, let's dive into the architecture. The system consists of several key components that work together.
 ```
 
-Save and you're ready!
+---
 
 ## Giving a Presentation
 
 ### Start the Presentation
 
-```powershell
+```bash
 moves present MyTalk
 ```
 
-You'll see a dashboard showing:
-- Current slide / total slides
-- Recognized speech
-- Similarity scores
-- System status
+The first run downloads ONNX models (~500MB total):
+- Speech-to-text model (NeMo Streaming Fast Conformer)
+- Voice activity detection (Silero VAD)
+- Semantic embedding model (all-MiniLM-L6-v2)
 
-### During Your Talk
+### The Dashboard
 
-**Microphone listening**: Speak naturally about each slide's content. When your speech matches the section in `sections.md`, the slide advances automatically.
+You'll see a Rich terminal UI showing:
+- **State**: ACTIVE, PAUSED, or LOCKED
+- **Slide**: Current slide / total slides
+- **Similarity**: Match score percentage
+- **Speech**: Recognized words from your microphone
+- **Match**: Content from current section
 
-**Keyboard shortcuts** (in case you need to help):
-- `←` – Go to previous slide
-- `→` – Go to next slide
-- `Ins` – Pause/Resume listening (stop for questions, resume when ready)
-- `Ctrl+C` – Exit presentation
+### Keyboard Controls
 
-**Tips for best results:**
-1. **Speak clearly** – Articulate words distinctly
-2. **Match your script** – Use similar phrasing to what's in `sections.md`
-3. **Steady pace** – Normal conversational speed works best
-4. **Quiet environment** – Less background noise = better recognition
-5. **Test first** – Do a dry run before the real presentation
+| Key | Action |
+|-----|--------|
+| `←` | Previous slide |
+| `→` | Next slide |
+| `M` | Toggle pause/resume microphone |
+| `Q` | Quit presentation |
+| `Ctrl+C` | Force exit |
+
+### States Explained
+
+- **ACTIVE** – Listening and auto-navigating. When speech matches next section content above 70% threshold, slide advances automatically.
+- **PAUSED** – Microphone muted. Use for Q&A or breaks. Keyboard navigation still works.
+- **LOCKED** – Manual navigation detected (you pressed arrow keys). Auto-advance disabled until speech matches current section again.
+
+### Tips for Best Results
+
+1. **Speak clearly** – Normal conversational pace works best
+2. **Match your script** – Use similar phrasing to what's in sections.md
+3. **Quiet environment** – Less background noise = better recognition
+4. **Test first** – Do a dry run before your actual presentation
+5. **Use pauses strategically** – Press M during questions or discussions
 
 ### Exit Presentation
 
-Press `Ctrl+C` to stop. You'll see:
-
+Press `Q` or `Ctrl+C` to exit:
 ```
 Presentation ended.
 ```
+
+---
 
 ## Managing Speakers
 
 ### List All Speakers
 
-```powershell
+```bash
 moves speaker list
 ```
 
-Shows:
+Output:
 ```
 There are 2 registered speaker(s).
 
-NAME         ID       STATUS      LAST PROCESSED
-MyTalk       a1b2c    Ready       2 hours ago
-OtherTalk    d1e2f    Not Ready   Never
+NAME       ID      STATUS      LAST PROCESSED
+MyTalk     a1b2c   Ready       2024-01-15 14:30
+OtherTalk  d1e2f   Not Ready   N/A
+
+Data directory: ~/.moves/speakers
 ```
+
+**Status meanings:**
+- `Ready` – Prepared and has sections.md
+- `Not Ready` – Added but not yet prepared
 
 ### Show Speaker Details
 
-```powershell
+```bash
 moves speaker show MyTalk
 ```
 
-Shows all metadata, paths, and status.
+Output:
+```
+Showing details for MyTalk (a1b2c)
+
+  Name: MyTalk
+  ID: a1b2c
+  Status: Ready
+  Last Processed: 2024-01-15 14:30
+  Data directory: ~/.moves/speakers/a1b2c
+  Sections file: ~/.moves/speakers/a1b2c/sections.md
+  Presentation source: /path/to/presentation.pdf
+  Transcript source: /path/to/transcript.txt
+```
 
 ### Update Speaker Files
 
-If you fix your PDF or update your transcript:
+If you update your presentation or transcript:
 
-```powershell
-moves speaker edit MyTalk `
-  --presentation C:\new\my_talk.pdf `
-  --transcript C:\new\my_talk.txt
+```bash
+# Update presentation only
+moves speaker edit MyTalk --presentation /new/path/to/presentation.pdf
+
+# Update transcript only
+moves speaker edit MyTalk --transcript /new/path/to/transcript.txt
+
+# Update both
+moves speaker edit MyTalk -p /new/presentation.pdf -t /new/transcript.txt
 ```
 
 Then re-prepare:
-
-```powershell
+```bash
 moves speaker prepare MyTalk
 ```
 
 ### Delete a Speaker
 
-```powershell
+```bash
+# Delete single speaker
 moves speaker delete MyTalk
-```
 
-Or delete all:
+# Delete without confirmation
+moves speaker delete MyTalk --yes
 
-```powershell
+# Delete all speakers
 moves speaker delete --all
 ```
 
-You'll be asked to confirm. All data will be removed.
+---
 
 ## Troubleshooting
 
 ### "No speakers found"
 
-**Problem**: `moves speaker list` shows no speakers.
+**Problem:** `moves speaker list` shows no speakers.
 
-**Solution**:
-1. Check if any exist: `dir $env:USERPROFILE\.moves\speakers`
-2. If directory is empty, add a speaker: `moves speaker add ...`
-3. If directory exists but not showing, check permissions on `~/.moves/`
+**Solution:**
+```bash
+# Check if any exist
+ls ~/.moves/speakers/
 
-### "Speaker not ready"
-
-**Problem**: `moves present MyTalk` says speaker hasn't been prepared.
-
-**Solution**:
-```powershell
-moves speaker prepare MyTalk
+# Create one
+moves speaker add MyTalk presentation.pdf transcript.txt
 ```
 
-If using LLM, check your LLM is configured:
-```powershell
-moves settings list
+### "Speaker has not been prepared yet"
+
+**Problem:** Can't present because sections.md doesn't exist.
+
+**Solution:**
+```bash
+moves speaker prepare MyTalk
+
+# Or use manual mode
+moves speaker prepare MyTalk --manual
+```
+
+### "LLM model not configured"
+
+**Problem:** Automatic preparation requires LLM configuration.
+
+**Solutions:**
+```bash
+# Option 1: Configure LLM
+moves settings set model gemini/gemini-2.5-flash-lite
+moves settings set key
+moves speaker prepare MyTalk
+
+# Option 2: Use manual mode (no LLM)
+moves speaker prepare MyTalk --manual
 ```
 
 ### Microphone Not Working
 
-**Problem**: During presentation, no speech is being recognized.
+**Problem:** No speech being recognized.
 
-**Solutions**:
-1. **Test Windows audio**: Settings → Sound → Volume mixer
-2. **Check if microphone is muted**: Click volume icon, unmute microphone
-3. **Test microphone**: Run `moves present MyTalk`, try speaking
-4. **Try a different microphone** if available
+**Solutions:**
+1. Check system microphone settings
+2. Verify microphone is not muted
+3. Test microphone in another application
+4. Try a different microphone
 
-### Speech Recognition Not Working
+### Speech Not Matching
 
-**Problem**: You're speaking but nothing is recognized.
+**Problem:** Speaking but slides don't advance.
 
-**Causes & Solutions**:
-- **Content mismatch** – Your sections.md might not match what you're actually saying
-  - Edit sections.md to match your real script
-  - Re-prepare with better transcript
-- **Accent/pronunciation** – STT might struggle with your accent
-  - Speak more clearly and deliberately
-  - Use "Pause" (Ins key) between sections
-- **Background noise** – Too much noise confuses the model
-  - Find a quieter room
-  - Close notifications, silence phone
+**Causes & Solutions:**
+1. **Content mismatch** – Your sections.md may not match what you're saying
+   - Edit sections.md to match your actual speech
+2. **Low similarity** – Threshold is 70%
+   - Speak more clearly or closely match the section content
+3. **Background noise** – VAD might filter your speech
+   - Try a quieter environment
 
-### "LLM Configuration Not Found"
+### Source Files Changed Warning
 
-**Problem**: Can't prepare speaker, says model or API key not configured.
+**Problem:** Warning that files have changed since last preparation.
 
-**Solution**:
-```powershell
-moves settings set model gemini/gemini-2.5-flash-lite
-moves settings set key
-# (paste your API key when prompted)
+**Solution:**
+```bash
+# Re-prepare with updated files
+moves speaker prepare MyTalk
+
+# Or continue with old data
+# Choose 'y' when prompted
 ```
 
-Or use manual mode (no LLM):
-```powershell
-moves speaker prepare MyTalk --manual
-```
+### Models Taking Too Long
 
-### Section Files Changed Warning
+**Problem:** First run is slow.
 
-**Problem**: Preparing again warns that "sections.md has been modified".
+**Explanation:** ONNX models (~500MB) are downloaded on first use.
 
-**Solution**:
-This is normal if you edited sections.md manually. Choose:
-- **Yes (y)** – Continue, keep your edits
-- **Save (s)** – Update the hash so it doesn't warn again
-- **No (n)** – Cancel and don't update
+**Solution:** Wait for downloads to complete (5-10 minutes typical). Progress is shown.
 
-### Models Taking Too Long to Download
-
-**Problem**: First run is very slow.
-
-**Reason**: ONNX models (~400-500MB) are downloading.
-
-**Solution**: 
-- Wait for completion (5-10 minutes depending on internet)
-- Check: `dir $env:USERPROFILE\.moves\ml_models` to see download progress
+---
 
 ## Frequently Asked Questions
 
 ### Q: Is my voice data sent to the cloud?
 
-**A:** No. Speech recognition happens offline using local ONNX models. Your voice never leaves your machine. The only cloud call is to the LLM (if you use automatic preparation), which is optional—you can use `--manual` mode instead.
+**A:** No. Speech recognition happens **100% offline** using local ONNX models. Your voice never leaves your machine. The only cloud call is the optional LLM for section generation, which can be skipped using `--manual` mode.
 
-### Q: Can I use my own presentation slides (not PDF)?
+### Q: What file formats are supported?
 
-**A:** Yes! moves-cli supports multiple formats with **100% free, open-source libraries**:
-- **PDF** - PyMuPDF4LLM (optimized for LLM processing)
-- **DOCX** - python-docx (Word documents)
-- **PPTX** - python-pptx (PowerPoint presentations)
-- **TXT** - Native text support
+**A:** Four formats using 100% free, open-source libraries:
+- **PDF** – PyMuPDF4LLM
+- **DOCX** – python-docx
+- **PPTX** – python-pptx
+- **TXT** – Native
 
-No commercial licenses or PyMuPDF Pro required! Just provide the file path directly:
-```powershell
-moves speaker add MyTalk C:\talks\my_talk.pptx C:\talks\my_talk.txt
-```
+No commercial licenses required.
 
 ### Q: What if my transcript doesn't perfectly match my slides?
 
-**A:** It's OK! The tool is designed to be flexible:
-- Add approximate content for each slide in `sections.md`
-- During presentation, it matches your speech approximately
-- If not matching, use keyboard shortcuts (← →) to navigate manually
+**A:** That's fine! The system uses hybrid similarity matching (semantic + phonetic) to handle variations. Tips:
+- Add approximate content for each slide
+- Use keyboard shortcuts for manual backup
+- Edit sections.md to better match what you actually say
 
-### Q: Can I have multiple presentations ready?
+### Q: Can I have multiple presentations?
 
 **A:** Yes! Create multiple speakers:
+```bash
+moves speaker add Talk1 talk1.pdf transcript1.txt
+moves speaker add Talk2 talk2.pdf transcript2.txt
 
-```powershell
-moves speaker add Talk1 C:\talks\talk1.pdf C:\talks\talk1.txt
-moves speaker add Talk2 C:\talks\talk2.pdf C:\talks\talk2.txt
-
-moves present Talk1     # First presentation
-moves present Talk2     # Different presentation
+moves present Talk1  # First presentation
+moves present Talk2  # Different presentation
 ```
 
 ### Q: How accurate is the slide detection?
 
-**A:** Accuracy depends on:
-- **Content match** – How well your `sections.md` matches what you say
-- **Speech clarity** – Clear speech recognizes better
-- **Audio quality** – Quiet environment works best
+**A:** Depends on:
+- **Content match** – How well sections.md matches your speech
+- **Speech clarity** – Clear speech = better recognition
+- **Environment** – Quiet rooms work best
 
-Typical accuracy: 85-95% automatic advances with manual backups via keyboard.
+Typical: 85-95% automatic advances with keyboard backup.
 
 ### Q: Can I use a different LLM provider?
 
-**A:** Yes! Any provider supported by LiteLLM works:
-
-```powershell
+**A:** Yes! Any provider supported by [LiteLLM](https://docs.litellm.ai/):
+```bash
 moves settings set model claude-3-5-sonnet
-# or
 moves settings set model gpt-4o
-# or others...
+moves settings set model groq/mixtral-8x7b-32768
 ```
 
 See [Configuration Guide](CONFIGURATION.md) for full list.
 
-### Q: What if I mess up `sections.md`?
+### Q: What if I mess up sections.md?
 
-**A:** You can re-prepare to regenerate it:
-
-```powershell
+**A:** Re-prepare to regenerate:
+```bash
 moves speaker prepare MyTalk
 ```
 
-This will overwrite your manual edits. If you had custom content, keep a backup.
+This overwrites existing content. Keep a backup if you have manual edits.
 
-### Q: Can I use this without an internet connection?
+### Q: Can I use this without internet?
 
-**A:** Partially:
-- **Presentation phase** – Yes, fully offline after models are downloaded
-- **Preparation phase** – Requires internet for LLM, unless using `--manual` mode
+**A:** **Presentation:** Yes, fully offline after models are downloaded.
+**Preparation:** Requires internet for LLM, unless using `--manual` mode.
 
-### Q: How much disk space does this need?
+### Q: How much disk space is needed?
 
-**A:** 
-- Models: ~400-500MB (one-time download)
-- Speaker data: ~1-10MB per speaker (depending on presentation size)
+**A:**
+- Models: ~500MB (one-time download)
+- Speaker data: ~1-10MB per speaker
 - Total: ~500MB + speaker data
 
-### Q: Can I use slides from presentation tools directly?
+### Q: How do I update my presentation slides?
 
-**A:** Yes! moves-cli supports multiple formats:
-- **PDF** - Direct support (no export needed)
-- **PPTX** - Direct support with PyMuPDF Pro
-- **DOCX** - Direct support with PyMuPDF Pro
+**A:**
+```bash
+# Update the presentation file
+moves speaker edit MyTalk --presentation /new/presentation.pdf
 
-If you prefer PDF or don't have PyMuPDF Pro:
-- **PowerPoint**: File → Export as PDF or use .pptx directly
-- **Google Slides**: File → Download → PDF (or PPTX)
-- **LibreOffice**: File → Export as PDF
-
-Then use the file with `moves`.
+# Re-prepare to regenerate sections
+moves speaker prepare MyTalk
+```
 
 ### Q: What happens if I interrupt preparation?
 
-**A:** Interrupting (Ctrl+C) will stop the process. You can restart:
-
-```powershell
+**A:** The process stops. Run again to restart:
+```bash
 moves speaker prepare MyTalk
 ```
 
-It will re-process from the beginning.
+### Q: Can I edit the generated sections?
+
+**A:** Yes! After preparation, edit the file:
+```bash
+# Open sections.md in your editor
+nano ~/.moves/speakers/a1b2c/sections.md
+```
+
+The system will detect the changes and prompt you when presenting.
+
+### Q: What are the keyboard shortcuts during presentation?
+
+**A:**
+| Key | Action |
+|-----|--------|
+| `←` | Previous slide |
+| `→` | Next slide |
+| `M` | Pause/Resume microphone |
+| `Q` | Quit |
+| `Ctrl+C` | Force exit |
+
+### Q: How does the similarity matching work?
+
+**A:** Two methods combined:
+1. **Semantic (60%)** – all-MiniLM-L6-v2 embeddings compare meaning
+2. **Phonetic (40%)** – Metaphone + RapidFuzz for sound-alike matching
+
+Score ≥ 70% triggers auto-advance.
+
+### Q: Why did my slide advance incorrectly?
+
+**A:** Possible causes:
+- Speech matched a different section's content
+- Sections have similar content
+- Threshold set too low
+
+Solution: Edit sections.md to make each section more distinct.
 
 ---
 
-**Need more help?** Check the [Architecture Guide](ARCHITECTURE.md) for technical details or see the [CLI Reference](CLI_REFERENCE.md) for all available commands.
+For more details, see:
+- [Architecture Guide](ARCHITECTURE.md) – How the system works
+- [CLI Reference](CLI_REFERENCE.md) – All commands
+- [Configuration Guide](CONFIGURATION.md) – Tuning options
