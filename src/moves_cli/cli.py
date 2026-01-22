@@ -84,9 +84,15 @@ def speaker_add(
         presentation_path = resolve_source_path(source_presentation)
         transcript_path = resolve_source_path(source_transcript)
 
-        # Add speaker
+        # Add speaker with original source strings
         speaker_manager = speaker_manager_instance()
-        speaker = speaker_manager.add(name, presentation_path, transcript_path)
+        speaker = speaker_manager.add(
+            name,
+            presentation_path,
+            transcript_path,
+            source_presentation,
+            source_transcript,
+        )
 
         # Display success message
         speaker_dir = speaker_manager.SPEAKERS_PATH / speaker.speaker_id
@@ -95,8 +101,8 @@ def speaker_add(
                 f"Speaker {speaker.label} has been successfully added.",
                 {
                     "Data directory": speaker_dir,
-                    "Presentation source": speaker.source_presentation,
-                    "Transcript source": speaker.source_transcript,
+                    "Presentation source": speaker.presentation_source_display,
+                    "Transcript source": speaker.transcript_source_display,
                 },
             )
         )
@@ -152,18 +158,22 @@ def speaker_edit(
         if source_transcript:
             transcript_path = resolve_source_path(source_transcript)
 
-        # Update speaker
+        # Update speaker with original source strings
         updated_speaker = speaker_manager.edit(
-            resolved_speaker, presentation_path, transcript_path
+            resolved_speaker,
+            presentation_path,
+            transcript_path,
+            source_presentation,
+            source_transcript,
         )
 
         # Display updated speaker information
         speaker_dir = speaker_manager.SPEAKERS_PATH / updated_speaker.speaker_id
         updates = {"Data directory": speaker_dir}
         if presentation_path:
-            updates["New presentation source"] = updated_speaker.source_presentation
+            updates["New presentation source"] = updated_speaker.presentation_source_display
         if transcript_path:
-            updates["New transcript source"] = updated_speaker.source_transcript
+            updates["New transcript source"] = updated_speaker.transcript_source_display
         typer.echo(
             output(
                 f"Speaker {updated_speaker.label} has been successfully edited.",
@@ -255,8 +265,8 @@ def speaker_show(
                     "Last Processed": last_processed_str,
                     "Data directory": speaker_dir,
                     "Sections file": resolved_speaker.sections_file,
-                    "Presentation source": resolved_speaker.source_presentation,
-                    "Transcript source": resolved_speaker.source_transcript,
+                    "Presentation source": resolved_speaker.presentation_source_display,
+                    "Transcript source": resolved_speaker.transcript_source_display,
                 },
             )
         )
