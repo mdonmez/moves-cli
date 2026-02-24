@@ -1,150 +1,162 @@
-# Agent Guidelines for moves-cli
+# AGENTS.md - moves-cli
 
-moves-cli is a Python CLI tool for voice-controlled presentation navigation.
+Guidance for coding agents working in this repository.
+Derived from current repo state in `src/moves_cli`.
 
-**Tech Stack**: Python 3.13+, Typer, Rich, Sherpa-ONNX, FastEmbed, LiteLLM, PyMuPDF4LLM, python-pptx, python-docx
+## Project Snapshot
+- Python CLI app (`moves`) for voice-controlled slide navigation.
+- Python requirement: `>=3.13`.
+- Package/build tooling: `uv` + `uv_build`.
+- Console script entry: `moves = moves_cli.cli:app`.
+- Core libraries in use: `typer`, `rich`, `xxhash`, `ruamel.yaml`, `httpx`, `fastembed`, `litellm`, `pydantic`, `sherpa-onnx`.
 
-## Commands
+## High-Signal Layout
+- `src/moves_cli/cli.py`: Typer command tree and top-level UX.
+- `src/moves_cli/core/speaker_manager.py`: speaker CRUD, processing, hashes.
+- `src/moves_cli/core/presentation_controller.py`: live control loop.
+- `src/moves_cli/core/settings_editor.py`: settings operations.
+- `src/moves_cli/core/components/*`: section/chunk/similarity logic.
+- `src/moves_cli/models.py`: dataclasses/enums and model metadata.
+- `src/moves_cli/config.py`: global constants/defaults.
+- `src/moves_cli/utils/*`: data handling, formatting, text normalization, integrations.
+- `src/moves_cli/data/*`: prompt/model assets.
+- `docs/*`: architecture and contributor documentation.
+- `experiments/*`: ad-hoc scripts (not formal tests).
 
-### Package Management (uv)
+## Setup Commands
+Use `uv` tooling only.
 
 ```powershell
-uv add <package>           # Add dependency
-uv add -d <package>        # Add dev dependency
-uv sync                    # Install from lockfile
-uv pip install -e .        # Editable install
+uv sync
+uv pip install -e .
 ```
 
-### Lint & Format
+If local tooling is missing:
 
 ```powershell
-uv run ruff check src/         # Check issues
-uv run ruff format src/        # Format code
-uv run ruff check --fix src/   # Auto-fix
+uv add -d ruff pytest
 ```
 
-### Testing
+## Build / Lint / Test Commands
+
+### Build
+```powershell
+uv build
+```
+
+### Lint and Format
+```powershell
+uv run ruff check src
+uv run ruff check src --fix
+uv run ruff format src
+```
+
+### Tests
+There is no committed `tests/` directory yet. Use these patterns when tests exist:
 
 ```powershell
-uv run pytest tests/                        # All tests
-uv run pytest tests/test_file.py            # Single file
-uv run pytest tests/test_file.py::test_name # Single test
-uv run pytest -v tests/                     # Verbose
+uv run pytest
+uv run pytest tests/test_file.py
+uv run pytest tests/test_file.py::test_name
+uv run pytest tests/test_file.py::TestClass::test_name
+uv run pytest -k "keyword"
+uv run pytest -x -q
 ```
 
-### CLI
+Single-test guidance (important):
+- Single file: `uv run pytest tests/test_similarity.py`
+- Single function: `uv run pytest tests/test_similarity.py::test_exact_match`
+- Single class method: `uv run pytest tests/test_similarity.py::TestCalc::test_exact_match`
 
+Current runnable validation scripts:
+
+```powershell
+uv run experiments/test_renderer_results.py
+uv run experiments/test_mistune_renderer.py
+```
+
+## Quick CLI Smoke Checks
 ```powershell
 moves --version
 moves --help
 moves speaker list
-moves present <speaker>
+moves settings list
 ```
 
-## Code Style
-
-### Type Hints
-
-- Built-in collections: `list[int]`, `dict[str, int]`
-- Pipe for unions: `int | None`, `str | int`
-- Avoid `typing.List`, `typing.Dict`, `typing.Optional`
+## Code Style Guidelines
 
 ### Imports
+- Group imports as stdlib, third-party, local.
+- Keep imports explicit (no wildcard imports).
+- Prefer top-level imports; use lazy imports only for heavy deps/startup/cycle concerns (pattern already used in `cli.py`).
 
-- Alphabetical within groups, separate stdlib/third-party/local
-- Explicit imports, no wildcards
+### Formatting
+- Use Ruff formatting as source of truth.
+- Split long calls/collections for readability.
+- Keep helper functions small and composable.
 
-```python
-from dataclasses import dataclass
-from enum import StrEnum
-from pathlib import Path
-
-import typer
-
-from moves_cli.config import DATA_FOLDER
-from moves_cli.models import Section
-```
-
-### Dataclasses & Models
-
-- Use `@dataclass`, `frozen=True` for immutable
-- Use `StrEnum` for string enums
+### Typing
+- Annotate parameters and return values.
+- Prefer built-in generics: `list[str]`, `dict[str, int]`, `tuple[int, ...]`.
+- Prefer modern unions: `str | None`.
+- Existing code still has some `typing.Optional`; do not add new `Optional` unless staying local to untouched legacy code.
 
 ### Naming
+- `snake_case`: functions/variables/modules.
+- `PascalCase`: classes.
+- `UPPER_SNAKE_CASE`: constants.
+- Prefix private helpers with `_`.
 
-- Classes: `PascalCase`
-- Functions: `snake_case`
-- Constants: `ALL_CAPS`
-- Private: leading underscore
+### Data Models
+- Dataclasses are primary model style (`models.py`).
+- Use `frozen=True` when immutability is required.
+- Use `StrEnum` for string enums.
 
-### Docstrings
-
-- Google-style for complex functions
-- One-line for simple functions
-
-### File Operations
-
-- Use `pathlib.Path`, convert to `str()` for libraries
-- Use context managers
+### Paths and IO
+- Use `pathlib.Path` for filesystem paths.
+- Route app file operations through `DataHandler` when practical.
+- Use UTF-8 explicitly for text reads/writes.
 
 ### Error Handling
+- Raise specific exceptions with actionable messages.
+- Preserve original exceptions with `raise ... from e` when wrapping.
+- In CLI handlers, display user-facing errors and exit with `typer.Exit(1)`.
+- Re-raise `typer.Exit`; handle `typer.Abort` deliberately.
 
-- Specific exceptions, re-raise with `from e`
-- CLI: handle `typer.Exit`, use `output()` formatter
+### Output and UX
+- Prefer `typer.echo(output(...))` for user-visible messages.
+- Keep error messages concise and include the next step when possible.
+- Use `err=True` for error-path output.
 
-```python
-try:
-    ...
-except typer.Exit:
-    raise
-except (ValueError, FileNotFoundError) as e:
-    typer.echo(output(f"Error: {str(e)}"), err=True)
-    raise typer.Exit(1)
-```
+### Async / Concurrency
+- Prefer `asyncio` for orchestration.
+- Use `asyncio.to_thread` for blocking operations.
+- Keep signal/cancellation behavior consistent with existing `SpeakerManager.process` flow.
 
-### Logging
+## Testing Guidance for New Work
+- Add tests under `tests/` with `test_*.py` naming.
+- Mirror source layout where helpful.
+- Prioritize tests around speaker resolution, data handling edge cases, and similarity scoring.
+- For bug fixes, add a regression test before or with the code change.
 
-- Use `loguru`, include `exc_info=True` for errors
+## Domain-Specific Cautions
+- Do not edit model checksum constants in `src/moves_cli/models.py` unless model files actually changed and hashes were recalculated.
+- Preserve `speaker.yaml` compatibility when changing speaker metadata fields.
+- Keep offline/manual (`--manual`) workflows intact when changing preparation logic.
 
-### CLI Commands (Typer)
+## Cursor/Copilot Rules Check
+Searched for:
+- `.cursor/rules/`
+- `.cursorrules`
+- `.github/copilot-instructions.md`
 
-- `@app.command()` decorators, help text for all args
-- Use `typer.Option` and `typer.Argument`
+None are present in this repository right now.
+If added later, merge their directives into this file and treat them as authoritative.
 
-### String Formatting
-
-- Use f-strings only
-
-### Async
-
-- Use `asyncio`, wrap CLI entry points with `asyncio.run()`
-
-## Project Structure
-
-```
-src/moves_cli/
-├── __init__.py           # Package entry, version
-├── cli.py                # Typer CLI entry point
-├── config.py             # Configuration constants
-├── models.py             # Dataclass models
-├── core/
-│   ├── presentation_controller.py
-│   ├── speaker_manager.py
-│   ├── settings_editor.py
-│   └── components/
-│       ├── chunk_producer.py
-│       ├── section_producer.py
-│       └── similarity_calculator.py
-├── utils/
-│   ├── data_handler.py
-│   ├── formatters.py
-│   ├── text_normalizer.py
-│   └── google_handler.py
-└── data/                 # ML models
-```
-
-## Important Notes
-
-- **Windows-first**: Assumes Windows paths and keyring
-- **Model files**: ML models in `data/` - don't modify hashes
-- **Editable install**: Changes reflected immediately
+## Recommended Agent Workflow
+1. Read `pyproject.toml`, `README.md`, and relevant `docs/*.md` first.
+2. Make focused changes in `src/moves_cli/*`.
+3. Run lint/format on changed code.
+4. Run the narrowest test target possible (single test when available).
+5. If coverage is missing for changed behavior, add tests.
+6. Run a quick CLI smoke check for touched command paths.
