@@ -8,6 +8,7 @@
 
 ## _Regarding the stoppage of the development of the moves._
 
+> [!IMPORTANT]
 > _I built `moves` to solve the inevitable friction between natural human storytelling and the rigid mechanics of digital presentations. After months of coding, the project has reached its end. Not because of a technical failure, but because of a philosophical one._
 >
 > _Here is why I am stopping development of this project._
@@ -69,7 +70,7 @@
 > This is where the system collapses. moves tries to predict the intent to change a slide at `t=1` by analyzing the audio at `t=0`. However, the speaker makes the decision to speak at `t=2` based on the slide they will see at `t=1`. The system is trying to predict a future that hasn't even fully formed in the speaker's mind yet.
 >
 > This is not an engineering problem that can be solved with a better design. (Maybe issues above can be solved with better implementations, but this can't.) This is a limit of human-machine interaction. Unless we use something like Neuralink to read the motor cortex before the finger moves, no voice-based system will ever surpass the pure, lossless, and instantaneous translation of human intent provided by a simple remote control.
-
+>
 > ### Cancelled `moves with intelligence` Update
 >
 > I had planned a massive update to fix the issue of speakers deviating from their scripts. The plan was to rip out the semantic/phonetic engines and replace them with a ~350M parameters LLM fine-tuned via LoRA (unsloth distillation) using synthetic data from massive models like Claude, GPT etc.
