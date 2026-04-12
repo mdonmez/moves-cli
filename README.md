@@ -160,6 +160,12 @@ moves speaker show MyPresentation
 # Set your LLM model (e.g., Gemini 2.5 Flash)
 moves settings set model gemini/gemini-2.5-flash-lite
 
+# Set LLM API format: chat | responses | auto
+moves settings set format chat
+
+# Optional: set base URL (used when provided)
+moves settings set base_url https://your-openai-compatible-endpoint/v1
+
 # Set your API key (securely prompted)
 moves settings set key
 ```
@@ -189,8 +195,8 @@ moves present MyPresentation
 **Keyboard shortcuts during presentation:**
 
 - `←` / `→` – Previous / Next slide (manual navigation)
-- `Ins` – Pause/Resume microphone
-- `Ctrl+C` – Exit
+- `M` – Pause/Resume microphone
+- `Q` – Exit
 
 The tool listens to your speech and automatically advances slides when it detects you've moved to new content.
 
@@ -233,7 +239,7 @@ All speaker data is stored in `~/.moves/`:
 
 ```
 ~/.moves/
-├── settings.toml          # LLM model configuration
+├── settings.toml          # LLM model + API format + optional base URL configuration
 │                          # API key stored in system keyring (Windows Credential Manager)
 └── speakers/
     └── <speaker-id>/
@@ -297,6 +303,8 @@ moves speaker prepare MyPresentation --manual
 | `moves present <speaker>`                                      | Start live voice-controlled presentation  |
 | `moves settings list [--show]`                                 | Show current configuration                |
 | `moves settings set model <model>`                             | Set LLM model                             |
+| `moves settings set format <chat\|responses\|auto>`          | Set LLM API format                        |
+| `moves settings set base_url <url>`                            | Set optional LLM base URL                 |
 | `moves settings set key`                                       | Set API key (interactive, hidden input)   |
 | `moves settings unset <key>`                                   | Reset a setting to its default            |
 

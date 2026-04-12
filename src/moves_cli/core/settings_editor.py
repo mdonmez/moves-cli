@@ -3,7 +3,7 @@ from typing import Any
 import keyring
 import tomlkit
 
-from moves_cli.config import DEFAULT_LLM_MODEL
+from moves_cli.config import DEFAULT_LLM_BASE_URL, DEFAULT_LLM_FORMAT, DEFAULT_LLM_MODEL
 from moves_cli.models import Settings
 from moves_cli.utils.data_handler import DataHandler
 
@@ -19,6 +19,8 @@ class SettingsEditor:
 
         self._template_defaults: dict[str, Any] = {
             "model": DEFAULT_LLM_MODEL,
+            "format": DEFAULT_LLM_FORMAT,
+            "base_url": DEFAULT_LLM_BASE_URL,
         }
 
         try:
@@ -50,6 +52,18 @@ class SettingsEditor:
                         doc.add(
                             tomlkit.comment(
                                 "LLM model for speaker processing, find models at: https://models.litellm.ai/"
+                            )
+                        )
+                    case "format":
+                        doc.add(
+                            tomlkit.comment(
+                                "LLM API format for section generation: chat or responses"
+                            )
+                        )
+                    case "base_url":
+                        doc.add(
+                            tomlkit.comment(
+                                "Optional custom base URL for providers like custom_openai"
                             )
                         )
 
@@ -119,5 +133,7 @@ class SettingsEditor:
 
         return Settings(
             model=self._data.get("model") or None,
+            format=self._data.get("format") or DEFAULT_LLM_FORMAT,
+            base_url=self._data.get("base_url") or None,
             key=api_key,
         )

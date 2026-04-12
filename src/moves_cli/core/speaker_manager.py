@@ -97,7 +97,7 @@ class SpeakerManager:
                 except (ValueError, AttributeError):
                     # In case of unexpected urlparse behavior
                     is_url = False
-                
+
                 if not is_url:
                     data[k] = Path(v)
 
@@ -204,6 +204,8 @@ class SpeakerManager:
         speakers: list[Speaker],
         llm_model: str | None = None,
         llm_api_key: str | None = None,
+        llm_format: str = "chat",
+        llm_base_url: str | None = None,
         skip_confirmation: bool = False,
         manual_mode: bool = False,
     ) -> list[ProcessResult]:
@@ -392,6 +394,8 @@ class SpeakerManager:
                             transcript_path=source_transcript,
                             llm_model=llm_model,  # type: ignore
                             llm_api_key=llm_api_key,  # type: ignore
+                            llm_format=llm_format,
+                            llm_base_url=llm_base_url,
                             callback=progress_callback,
                         )
                         loop.call_soon_threadsafe(future.set_result, result)

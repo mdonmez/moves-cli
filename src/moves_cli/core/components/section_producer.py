@@ -10,7 +10,7 @@ import instructor
 with contextlib.redirect_stdout(io.StringIO()):
     import pymupdf4llm
 from docx import Document
-from litellm import completion
+from litellm import completion, responses
 from pptx import Presentation
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,129 @@ from moves_cli.models import Section
 
 
 class SectionProducer:
+    @staticmethod
+    def _resolve_temperature(llm_model: str) -> float:
+        model = llm_model.strip().lower()
+        if "gpt-5" in model:
+            return 1.0
+        return 0.2
+
+    @staticmethod
+    def _build_messages(
+        system_prompt: str, presentation_data: str, transcript_data: str
+    ) -> list[dict[str, str]]:
+        return [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": f"Presentation: {presentation_data}\nTranscript: {transcript_data}",
+            },
+        ]
+
+    @staticmethod
+    def _validate_llm_format(llm_format: str) -> Literal["chat", "responses", "auto"]:
+        normalized = llm_format.strip().lower()
+        if normalized not in {"chat", "responses", "auto"}:
+            raise ValueError(
+                f"Unsupported LLM format: {llm_format}. "
+                "Supported formats: chat, responses, auto"
+            )
+        return normalized  # type: ignore[return-value]
+
+    @staticmethod
+    def _extract_text_from_responses(response: object) -> str:
+        output_text = getattr(response, "output_text", None)
+        if isinstance(output_text, str) and output_text.strip():
+            return output_text
+
+        output_items = None
+        if isinstance(response, dict):
+            output_items = response.get("output")
+        else:
+            output_items = getattr(response, "output", None)
+
+        if not isinstance(output_items, list):
+            raise ValueError("Responses API returned unexpected output structure")
+
+        text_parts: list[str] = []
+        for item in output_items:
+            item_type = (
+                item.get("type")
+                if isinstance(item, dict)
+                else getattr(item, "type", None)
+            )
+            if item_type != "message":
+                continue
+
+            content_parts = (
+                item.get("content")
+                if isinstance(item, dict)
+                else getattr(item, "content", None)
+            )
+            if not isinstance(content_parts, list):
+                continue
+
+            for part in content_parts:
+                part_type = (
+                    part.get("type")
+                    if isinstance(part, dict)
+                    else getattr(part, "type", None)
+                )
+                part_text = (
+                    part.get("text")
+                    if isinstance(part, dict)
+                    else getattr(part, "text", None)
+                )
+
+                if part_type in {"output_text", "text"} and isinstance(part_text, str):
+                    text_parts.append(part_text)
+
+        result = "\n".join(part.strip() for part in text_parts if part and part.strip())
+        if result:
+            return result
+
+        raise ValueError("Responses API returned empty text output")
+
+    @staticmethod
+    def _build_sections_output_model(slide_count: int) -> type[BaseModel]:
+        # define output model with schema to reliable extract sections from llm response
+        class SectionsOutputModel(BaseModel):
+            class SectionItem(BaseModel):
+                section_index: int = Field(
+                    ...,
+                    ge=1,
+                    description="Index starting from 1",  # descriptions for llm to understand the schema
+                )
+                content: str = Field(..., description="Content of the section")
+
+            sections: list[SectionItem] = Field(  # type: ignore
+                ...,
+                description="List of section items, one for each slide",
+                min_items=slide_count,  # must be exact number of slides, min or max.
+                max_items=slide_count,
+            )
+
+        return SectionsOutputModel
+
+    @staticmethod
+    def _build_connection_kwargs(
+        llm_base_url: str | None,
+        target: Literal["chat", "responses"],
+    ) -> dict[str, str]:
+        if not llm_base_url:
+            return {}
+
+        base_url = llm_base_url.strip()
+        if not base_url:
+            return {}
+
+        if target == "chat":
+            return {"base_url": base_url}
+
+        # litellm.responses() doesn't expose base_url directly, but accepts
+        # provider connection params through GenericLiteLLMParams kwargs.
+        return {"api_base": base_url}
+
     def _extract_pdf(
         self, file_path: Path, extraction_type: Literal["transcript", "presentation"]
     ) -> str:
@@ -251,13 +374,9 @@ class SectionProducer:
         system_prompt = (
             files("moves_cli.data").joinpath("llm_instruction.md").read_text()
         )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": f"Presentation: {presentation_data}\nTranscript: {transcript_data}",
-            },
-        ]
+        messages = self._build_messages(
+            system_prompt, presentation_data, transcript_data
+        )
 
         # Count tokens (local, free)
         token_count = token_counter(model=llm_model, messages=messages)
@@ -272,31 +391,16 @@ class SectionProducer:
 
         return slide_count, token_count, prompt_cost
 
-    def _call_llm(
+    def _call_llm_chat(
         self,
         presentation_data: str,
         transcript_data: str,
         llm_model: str,
         llm_api_key: str,
+        llm_base_url: str | None,
     ) -> list[str]:
         slide_count = len(presentation_data.split("\n\n"))
-
-        # define output model with schema to reliable extract sections from llm response
-        class SectionsOutputModel(BaseModel):
-            class SectionItem(BaseModel):
-                section_index: int = Field(
-                    ...,
-                    ge=1,
-                    description="Index starting from 1",  # descriptions for llm to understand the schema
-                )
-                content: str = Field(..., description="Content of the section")
-
-            sections: list[SectionItem] = Field(  # type: ignore
-                ...,
-                description="List of section items, one for each slide",
-                min_items=slide_count,  # must be exact number of slides, min or max.
-                max_items=slide_count,
-            )
+        sections_output_model = self._build_sections_output_model(slide_count)
 
         try:
             import warnings
@@ -313,28 +417,123 @@ class SectionProducer:
             system_prompt = (
                 files("moves_cli.data").joinpath("llm_instruction.md").read_text()
             )
+            messages = self._build_messages(
+                system_prompt, presentation_data, transcript_data
+            )
             # we're pathching the litellm with instructor to use any llm with any schema
             client = instructor.from_litellm(
                 completion, mode=instructor.Mode.JSON
             )  # json for better llm output quality, also afaik the instructor retries on failure for these
+            connection_kwargs = self._build_connection_kwargs(
+                llm_base_url=llm_base_url,
+                target="chat",
+            )
+            temperature = self._resolve_temperature(llm_model)
 
             response = client.chat.completions.create(
                 model=llm_model,
                 api_key=llm_api_key,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": f"Presentation: {presentation_data}\nTranscript: {transcript_data}",
-                    },
-                ],
-                response_model=SectionsOutputModel,
-                temperature=0.2,  # i've set like this for deterministic results but if i change the prompt i need to increase this
+                messages=messages,
+                response_model=sections_output_model,
+                temperature=temperature,
+                **connection_kwargs,
             )
             result = [item.content for item in response.sections]
             return result
         except Exception as e:
             raise RuntimeError(f"LLM call failed: {e}") from e
+
+    def _call_llm_responses(
+        self,
+        presentation_data: str,
+        transcript_data: str,
+        llm_model: str,
+        llm_api_key: str,
+        llm_base_url: str | None,
+    ) -> list[str]:
+        slide_count = len(presentation_data.split("\n\n"))
+        sections_output_model = self._build_sections_output_model(slide_count)
+
+        try:
+            system_prompt = (
+                files("moves_cli.data").joinpath("llm_instruction.md").read_text()
+            )
+            messages = self._build_messages(
+                system_prompt, presentation_data, transcript_data
+            )
+            connection_kwargs = self._build_connection_kwargs(
+                llm_base_url=llm_base_url,
+                target="responses",
+            )
+            temperature = self._resolve_temperature(llm_model)
+
+            response = responses(
+                model=llm_model,
+                api_key=llm_api_key,
+                input=messages,
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "sections_output",
+                        "schema": sections_output_model.model_json_schema(),
+                        "strict": True,
+                    }
+                },
+                temperature=temperature,
+                **connection_kwargs,
+            )
+
+            response_text = self._extract_text_from_responses(response)
+            parsed_response = sections_output_model.model_validate_json(response_text)
+            return [item.content for item in parsed_response.sections]
+        except Exception as e:
+            raise RuntimeError(f"LLM call failed: {e}") from e
+
+    def _call_llm(
+        self,
+        presentation_data: str,
+        transcript_data: str,
+        llm_model: str,
+        llm_api_key: str,
+        llm_format: str,
+        llm_base_url: str | None,
+    ) -> list[str]:
+        selected_format = self._validate_llm_format(llm_format)
+
+        if selected_format == "chat":
+            return self._call_llm_chat(
+                presentation_data=presentation_data,
+                transcript_data=transcript_data,
+                llm_model=llm_model,
+                llm_api_key=llm_api_key,
+                llm_base_url=llm_base_url,
+            )
+
+        if selected_format == "responses":
+            return self._call_llm_responses(
+                presentation_data=presentation_data,
+                transcript_data=transcript_data,
+                llm_model=llm_model,
+                llm_api_key=llm_api_key,
+                llm_base_url=llm_base_url,
+            )
+
+        try:
+            return self._call_llm_responses(
+                presentation_data=presentation_data,
+                transcript_data=transcript_data,
+                llm_model=llm_model,
+                llm_api_key=llm_api_key,
+                llm_base_url=llm_base_url,
+            )
+        except Exception:
+            return self._call_llm_chat(
+                presentation_data=presentation_data,
+                transcript_data=transcript_data,
+                llm_model=llm_model,
+                llm_api_key=llm_api_key,
+                llm_base_url=llm_base_url,
+            )
 
     def convert_to_markdown(self, sections: list[Section]) -> str:
         """Convert sections to markdown format.
@@ -361,25 +560,35 @@ class SectionProducer:
     def load_from_markdown(self, markdown_content: str) -> list[Section]:
         """Load sections from markdown format.
 
-        Parses `# N. Slide` headings as section indices, content follows until next heading.
+        Parses section headings as section indices, content follows until next heading.
+
+        Supported heading formats:
+        - `# N. Slide` (canonical)
+        - `# Slide N` (legacy)
         """
         import re
 
         sections: list[Section] = []
-        # Split by heading pattern, keeping the delimiter
-        pattern = r"^#\s+(\d+)\.\s*Slide\s*$"
-        parts = re.split(pattern, markdown_content, flags=re.MULTILINE)
+        heading_pattern = re.compile(
+            r"^#\s*(?:(\d+)\.\s*Slide|Slide\s+(\d+))\s*$",
+            flags=re.MULTILINE,
+        )
+        matches = list(heading_pattern.finditer(markdown_content))
 
-        # parts[0] is content before first heading (usually empty)
-        # parts[1], parts[2] = first index, first content
-        # parts[3], parts[4] = second index, second content, etc.
+        for i, match in enumerate(matches):
+            section_index_str = match.group(1) or match.group(2)
+            if not section_index_str:
+                continue
 
-        i = 1
-        while i < len(parts) - 1:
-            section_index = int(parts[i])
-            content = parts[i + 1].strip()
+            section_index = int(section_index_str)
+            content_start = match.end()
+            content_end = (
+                matches[i + 1].start()
+                if i + 1 < len(matches)
+                else len(markdown_content)
+            )
+            content = markdown_content[content_start:content_end].strip()
             sections.append(Section(section_index=section_index, content=content))
-            i += 2
 
         return sections
 
@@ -389,6 +598,8 @@ class SectionProducer:
         transcript_path: Path,
         llm_model: str,
         llm_api_key: str,
+        llm_format: str,
+        llm_base_url: str | None,
         callback: Callable[[str], None] | None = None,
     ) -> list[Section]:
         if callback:
@@ -406,6 +617,8 @@ class SectionProducer:
             transcript_data=transcript_data,
             llm_model=llm_model,
             llm_api_key=llm_api_key,
+            llm_format=llm_format,
+            llm_base_url=llm_base_url,
         )
 
         generated_sections: list[Section] = []

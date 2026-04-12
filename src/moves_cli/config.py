@@ -23,6 +23,10 @@ CANDIDATE_RANGE_MAX_OFFSET: int = 5
 
 # Default settings (used by SettingsEditor)
 DEFAULT_LLM_MODEL: str = "gemini/gemini-2.5-flash-lite"  # gemini, nearly everyone have google account and gemini api is free
+DEFAULT_LLM_FORMAT: str = (
+    "chat"  # chat = instructor+chat.completions, responses = litellm.responses
+)
+DEFAULT_LLM_BASE_URL: str = ""
 DEFAULT_API_KEY: str = ""
 
 # VAD configuration (tuned for office/home environments, adjust for large venues)

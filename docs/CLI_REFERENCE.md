@@ -371,7 +371,7 @@ moves present MyTalk
 ```
 Presentation started for MyTalk (a1b2c).
 
-[←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit
+[M] Pause/Resume | [←/→] Previous/Next | [Q] Exit
 
 [Interactive dashboard shows during presentation]
 
@@ -383,8 +383,8 @@ Presentation ended.
 |-----|--------|
 | `←` (Left Arrow) | Go to previous slide |
 | `→` (Right Arrow) | Go to next slide |
-| `Ins` (Insert) | Toggle pause/resume (freeze microphone) |
-| `Ctrl+C` | Exit presentation |
+| `M` | Toggle pause/resume (freeze microphone) |
+| `Q` | Exit presentation |
 
 **Dashboard Display:**
 The Rich UI shows:
@@ -432,6 +432,12 @@ Configuration file:
 model (LLM Model):
   gemini/gemini-2.5-flash-lite
 
+format (LLM API Format):
+  chat
+
+base_url (LLM Base URL):
+  Not configured
+
 key (API Key):
   gemi****b8fk
 
@@ -443,7 +449,7 @@ Note:
 
 ### `moves settings set`
 
-Configure a setting (model or API key).
+Configure a setting (model, format, base_url, or API key).
 
 **Syntax:**
 ```powershell
@@ -451,13 +457,21 @@ moves settings set SETTING [VALUE]
 ```
 
 **Arguments:**
-- `SETTING` (required) – Setting name: `model` or `key`
-- `VALUE` (optional) – Setting value (only for `model`, required)
+- `SETTING` (required) – Setting name: `model`, `format`, `base_url`, or `key`
+- `VALUE` (optional) – Setting value (required for `model`, `format`, and `base_url`)
 
 **Examples:**
 ```powershell
 # Set LLM model
 moves settings set model gemini/gemini-2.5-flash-lite
+
+# Set LLM API format
+moves settings set format chat
+moves settings set format responses
+moves settings set format auto
+
+# Set optional LLM base URL
+moves settings set base_url https://your-openai-compatible-endpoint/v1
 
 # Set API key (interactive, hidden input)
 moves settings set key
@@ -505,12 +519,18 @@ moves settings unset SETTING
 ```
 
 **Arguments:**
-- `SETTING` (required) – Setting name: `model` or `key`
+- `SETTING` (required) – Setting name: `model`, `format`, `base_url`, or `key`
 
 **Examples:**
 ```powershell
 # Reset model to default
 moves settings unset model
+
+# Reset format to default
+moves settings unset format
+
+# Reset base URL to default (empty)
+moves settings unset base_url
 
 # Reset API key
 moves settings unset key

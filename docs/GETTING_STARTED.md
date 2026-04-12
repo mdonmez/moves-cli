@@ -147,6 +147,9 @@ First, you need to set up an LLM. Here are popular free options:
 3. In `moves`, run:
    ```powershell
    moves settings set model gemini/gemini-2.5-flash-lite
+   moves settings set format chat
+   # Optional endpoint override:
+   # moves settings set base_url https://your-openai-compatible-endpoint/v1
    moves settings set key
    ```
 4. Paste your API key when prompted (text will be hidden)
@@ -157,6 +160,9 @@ First, you need to set up an LLM. Here are popular free options:
 3. In `moves`, run:
    ```powershell
    moves settings set model gpt-4o-mini
+   moves settings set format chat
+   # Optional endpoint override:
+   # moves settings set base_url https://your-openai-compatible-endpoint/v1
    moves settings set key
    ```
 
@@ -194,26 +200,26 @@ notepad $env:USERPROFILE\.moves\speakers\a1b2c\sections.md
 The file looks like:
 
 ```markdown
-# Slide 1
+# 1. Slide
 Content for slide 1
 
-# Slide 2
+# 2. Slide
 Content for slide 2
 
-# Slide 3
+# 3. Slide
 Content for slide 3
 ```
 
 Add your speech notes for each slide:
 
 ```markdown
-# Slide 1
+# 1. Slide
 Hello everyone, thanks for coming. I'm excited to share this.
 
-# Slide 2
+# 2. Slide
 This is the overview. Three main topics today.
 
-# Slide 3
+# 3. Slide
 First, let me dive deeper into the architecture...
 ```
 
@@ -240,8 +246,8 @@ You'll see a dashboard showing:
 **Keyboard shortcuts** (in case you need to help):
 - `←` – Go to previous slide
 - `→` – Go to next slide
-- `Ins` – Pause/Resume listening (stop for questions, resume when ready)
-- `Ctrl+C` – Exit presentation
+- `M` – Pause/Resume listening (stop for questions, resume when ready)
+- `Q` – Exit presentation
 
 **Tips for best results:**
 1. **Speak clearly** – Articulate words distinctly
@@ -358,7 +364,7 @@ moves settings list
   - Re-prepare with better transcript
 - **Accent/pronunciation** – STT might struggle with your accent
   - Speak more clearly and deliberately
-  - Use "Pause" (Ins key) between sections
+  - Use "Pause" (M key) between sections
 - **Background noise** – Too much noise confuses the model
   - Find a quieter room
   - Close notifications, silence phone
@@ -370,6 +376,7 @@ moves settings list
 **Solution**:
 ```powershell
 moves settings set model gemini/gemini-2.5-flash-lite
+moves settings set format chat
 moves settings set key
 # (paste your API key when prompted)
 ```

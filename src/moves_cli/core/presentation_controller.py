@@ -586,13 +586,13 @@ class PresentationController:
 
     def control(self) -> None:
         """Main control loop with keyboard listener and audio processing."""
-        self.stt_processor_thread.start()
-        self.navigator_thread.start()
-
         blocksize = int(self.SAMPLE_RATE * self.FRAME_DURATION)
 
         # Create console before starting threads so they can use it for error messages
         self._console = Console(theme=THEME)
+
+        self.stt_processor_thread.start()
+        self.navigator_thread.start()
 
         # Start global keyboard listener for manual controls
         keyboard_listener = Listener(on_press=self._on_key_press)

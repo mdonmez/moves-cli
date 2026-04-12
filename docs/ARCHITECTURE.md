@@ -64,8 +64,8 @@ This allows the tool to warn users if their source materials have changed since 
   - System state (listening, paused, locked)
 - **Keyboard Control**:
   - `←` / `→` – Previous / Next
-  - `Ins` – Toggle pause
-  - `Ctrl+C` – Exit
+  - `M` – Toggle pause/resume
+  - `Q` – Exit
 
 **Thread Model**:
 - Main thread: UI rendering + keyboard listener
@@ -124,6 +124,8 @@ Slide advances when similarity score ≥ `SIMILARITY_THRESHOLD` (default: 0.7)
 
 **Configuration**:
 - `model` – LLM model name (stored in `settings.toml`)
+- `format` – LLM API format (`chat`, `responses`, `auto`) (stored in `settings.toml`)
+- `base_url` – Optional LLM base URL (used when set) (stored in `settings.toml`)
 - `key` – API key (stored in Windows Credential Manager via keyring)
 
 **Supported LLMs** (via LiteLLM):

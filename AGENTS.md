@@ -1,246 +1,134 @@
-# AGENTS.md - moves-cli
+# AGENTS.md
 
-Guidance for coding agents working in this repository.
-Derived from current repo state in `src/moves_cli`.
+Practical guidance for AI coding agents working in `moves-cli`.
 
-## Project Snapshot
+## 1) Mission and Status
 
-- Python CLI app (`moves`) for voice-controlled slide navigation.
-- Python requirement: `>=3.13`.
-- Package/build tooling: `uv` + `uv_build`.
-- Console script entry: `moves = moves_cli.cli:app`.
-- Core libraries in use:
-  - **CLI/UX**: `typer`, `rich`
-  - **Data**: `ruamel.yaml`, `tomlkit`, `pydantic`, `xxhash`
-  - **Text processing**: `mistune`, `num2words`, `unidecode`
-  - **Similarity**: `fastembed`, `jellyfish`, `rapidfuzz`, `numpy`
-  - **LLM integration**: `litellm`, `instructor[litellm]`
-  - **Document parsing**: `pymupdf`, `pymupdf4llm`, `python-docx`, `python-pptx`
-  - **Speech**: `sherpa-onnx`, `sherpa-onnx-core`, `sounddevice`
-  - **OS integration**: `pynput`, `keyring`
-  - **Network**: `httpx`
+- `moves-cli` is a Python CLI that auto-navigates slides from live speech.
+- Project status: maintenance-oriented; avoid broad feature churn unless explicitly requested.
+- Source of truth is code under `src/moves_cli/` (docs can lag).
 
-## High-Signal Layout
+## 2) Environment and Tooling
 
-- `src/moves_cli/cli.py`: Typer command tree and top-level UX.
-- `src/moves_cli/core/speaker_manager.py`: speaker CRUD, processing pipeline, xxhash checksums.
-- `src/moves_cli/core/presentation_controller.py`: live STT/VAD control loop, Rich dashboard.
-- `src/moves_cli/core/settings_editor.py`: settings CRUD (TOML file + system keyring for API key).
-- `src/moves_cli/core/components/chunk_producer.py`: sliding-window chunk generation from sections.
-- `src/moves_cli/core/components/section_producer.py`: document extraction (PDF/DOCX/PPTX), LLM-assisted section generation via `instructor` + `litellm`.
-- `src/moves_cli/core/components/similarity_calculator.py`: combined semantic+phonetic scoring with tie-breaking.
-- `src/moves_cli/core/components/similarity_units/semantic.py`: fastembed cosine similarity (all-MiniLM-L6-v2, weight 0.6).
-- `src/moves_cli/core/components/similarity_units/phonetic.py`: jellyfish metaphone + rapidfuzz ratio (weight 0.4).
-- `src/moves_cli/models.py`: dataclasses/enums and ML model metadata (`EmbeddingModel`, `SttModel`, `VadModel`, `Section`, `Chunk`, `Speaker`, `SimilarityResult`, `Settings`, `ProcessResult`).
-- `src/moves_cli/config.py`: global constants/defaults (`SIMILARITY_THRESHOLD=0.7`, `WINDOW_SIZE=12`, `SEMANTIC_WEIGHT=0.6`, `PHONETIC_WEIGHT=0.4`, VAD params).
-- `src/moves_cli/utils/data_handler.py`: file I/O abstraction rooted at `~/.moves/`.
-- `src/moves_cli/utils/formatters.py`: Rich output formatter (`output()`), markdown-to-plain-text renderer.
-- `src/moves_cli/utils/google_handler.py`: Google Drive/Docs/Slides URL detection, ID extraction, and file download.
-- `src/moves_cli/utils/id_generator.py`: speaker ID slug generation (`name-xxxxx`) and random chunk ID generation.
-- `src/moves_cli/utils/model_preparer.py`: async ONNX model download with xxhash verification and progress display.
-- `src/moves_cli/utils/text_normalizer.py`: Unicode normalization, diacritics removal, emoji stripping, num2words conversion.
-- `src/moves_cli/utils/calculate_hash.py`: standalone dev utility for computing xxh3_64 hashes of model files.
-- `src/moves_cli/data/llm_instruction.md`: LLM system prompt for section generation.
-- `src/moves_cli/data/ml_models/*`: bundled ONNX model files (embedding + STT + VAD).
-- `docs/*`: architecture and contributor documentation.
-- `experiments/*`: ad-hoc scripts (not formal tests).
-
-## Setup Commands
-
-Use `uv` tooling only.
+- Python: `>=3.13`.
+- Package manager/build: `uv` + `uv_build`.
+- Entry point: `moves = moves_cli.cli:app`.
+- Typical commands:
 
 ```powershell
 uv sync
-uv pip install -e .
-```
-
-If local tooling is missing:
-
-```powershell
-uv add -d ruff pytest
-```
-
-## Build / Lint / Test Commands
-
-### Build
-
-```powershell
+uv run ruff check src
+uv run moves --help
 uv build
 ```
 
-### Lint and Format
+## 3) High-Signal File Map
+
+- `src/moves_cli/cli.py`: Typer command tree (`speaker`, `settings`, `present`).
+- `src/moves_cli/core/speaker_manager.py`: speaker CRUD + prepare pipeline + hash checks.
+- `src/moves_cli/core/presentation_controller.py`: live STT/VAD loop, keyboard controls, Rich TUI.
+- `src/moves_cli/core/settings_editor.py`: settings TOML + keyring API key handling.
+- `src/moves_cli/core/components/section_producer.py`: document extraction + LLM section generation + markdown parsing.
+- `src/moves_cli/core/components/chunk_producer.py`: sliding-window chunk generation + candidate indexing.
+- `src/moves_cli/core/components/similarity_calculator.py`: semantic + phonetic score merge and ranking.
+- `src/moves_cli/core/components/similarity_units/semantic.py`: FastEmbed cosine similarity.
+- `src/moves_cli/core/components/similarity_units/phonetic.py`: metaphone + RapidFuzz similarity.
+- `src/moves_cli/models.py`: dataclasses/enums + ML model metadata/checksums.
+- `src/moves_cli/config.py`: global constants/defaults.
+- `src/moves_cli/utils/*`: formatting, IO, Google URL resolution, model downloads, normalization, IDs.
+- `src/moves_cli/data/llm_instruction.md`: system prompt used in section generation.
+
+## 4) Runtime Behavior (Must Preserve)
+
+- Two phases:
+  - Prepare (`moves speaker prepare`): create/update `sections.md`.
+  - Present (`moves present`): live recognition + similarity + navigation.
+- Keyboard controls are standardized:
+  - `M` = pause/resume
+  - `←/→` = manual navigation
+  - `Q` = quit
+- Data root is `~/.moves`:
+  - `settings.toml`
+  - `speakers/<speaker-id>/speaker.yaml`
+  - `speakers/<speaker-id>/sections.md`
+
+## 5) Contracts and Invariants
+
+- API key security:
+  - API key must stay in system keyring (not plaintext files).
+  - `moves settings set key` is interactive-only by design.
+- Sections markdown contract:
+  - Canonical heading: `# N. Slide`.
+  - Parser also accepts legacy `# Slide N`.
+- Similarity defaults (from `config.py`):
+  - `SEMANTIC_WEIGHT=0.6`, `PHONETIC_WEIGHT=0.4`, `SIMILARITY_THRESHOLD=0.7`.
+- Model integrity:
+  - `EmbeddingModel`, `SttModel`, `VadModel` file hashes in `models.py` are critical.
+  - Do not alter checksums unless model artifacts and hashes are intentionally updated.
+- Speaker metadata compatibility:
+  - Preserve `speaker.yaml` fields unless a migration is intentionally introduced.
+
+## 6) Dependency Constraints You Should Know
+
+- Current Windows compatibility requires:
+  - `sherpa-onnx>=1.12.23,<1.12.37`
+  - `sherpa-onnx-core>=1.12.23,<1.12.37`
+- Reason: newer versions may lack compatible Windows wheels and force failing source builds.
+- If asked to upgrade deps, validate `uv lock --upgrade && uv sync` on Windows before finalizing.
+
+## 7) Editing Guidelines
+
+- Keep changes minimal and targeted.
+- Prefer preserving existing architecture and flow.
+- Use type hints in modern style (`str | None`, `list[T]`, `dict[K, V]`).
+- Preserve user-facing CLI wording consistency across:
+  - `cli.py`
+  - `README.md`
+  - `docs/CLI_REFERENCE.md`
+  - `docs/GETTING_STARTED.md`
+  - `docs/ARCHITECTURE.md`
+- Avoid introducing new runtime dependencies unless requested.
+
+## 8) Verification Checklist After Code Changes
+
+- Always run:
 
 ```powershell
 uv run ruff check src
-uv run ruff check src --fix
-uv run ruff format src
 ```
 
-### Tests
-
-There is no committed `tests/` directory yet. Use these patterns when tests exist:
+- For CLI-affecting changes, also run smoke checks:
 
 ```powershell
-uv run pytest
-uv run pytest tests/test_file.py
-uv run pytest tests/test_file.py::test_name
-uv run pytest tests/test_file.py::TestClass::test_name
-uv run pytest -k "keyword"
-uv run pytest -x -q
+uv run moves --version
+uv run moves --help
+uv run moves speaker --help
+uv run moves settings --help
 ```
 
-Single-test guidance (important):
-
-- Single file: `uv run pytest tests/test_similarity.py`
-- Single function: `uv run pytest tests/test_similarity.py::test_exact_match`
-- Single class method: `uv run pytest tests/test_similarity.py::TestCalc::test_exact_match`
-
-Current runnable validation scripts:
+- For dependency changes:
 
 ```powershell
-uv run experiments/test_renderer_results.py
-uv run experiments/test_mistune_renderer.py
+uv lock --upgrade
+uv sync
 ```
 
-## Quick CLI Smoke Checks
+## 9) Current Testing Reality
 
-```powershell
-moves --version
-moves --help
-moves speaker list
-moves settings list
-```
+- There is no committed `tests/` suite in the repository right now.
+- Do not claim broad behavior guarantees from automated tests.
+- When fixing bugs, prefer adding targeted tests if/when test infra is introduced.
 
-## Domain Knowledge
+## 10) Common Footguns
 
-### CLI Command Tree
+- `pynput` sends key presses to the currently focused window; focus loss can break navigation.
+- Some docs/examples may mention older shortcuts or stale details; reconcile with source code.
+- `utils/calculate_hash.py` is a standalone utility, not a `moves` subcommand.
 
-| Command                                   | Description                                            |
-| ----------------------------------------- | ------------------------------------------------------ |
-| `moves speaker add <name> <pres> <trans>` | Create speaker profile                                 |
-| `moves speaker edit <speaker>`            | Update source files (`--presentation`, `--transcript`) |
-| `moves speaker list`                      | List all speakers and status                           |
-| `moves speaker show <speaker>`            | Show detailed speaker info                             |
-| `moves speaker prepare <speaker>`         | Generate sections (`--manual`, `--all`, `--yes`)       |
-| `moves speaker delete <speaker>`          | Delete speaker(s) (`--all`, `--yes`)                   |
-| `moves present <speaker>`                 | Start live voice presentation                          |
-| `moves settings list`                     | Show config (`--show` reveals full API key)            |
-| `moves settings set model <model>`        | Set LLM model                                          |
-| `moves settings set key`                  | Set API key (interactive, hidden input)                |
-| `moves settings unset <key>`              | Reset to default                                       |
+## 11) Recommended Agent Workflow
 
-### Supported File Formats
-
-- **Presentation**: PDF (via `pymupdf4llm`), DOCX (via `python-docx`), PPTX (via `python-pptx`)
-- **Transcript**: PDF, DOCX
-- **Google Drive / Google Docs / Google Slides**: public URLs auto-downloaded by `google_handler.py`
-
-### ML Models (bundled in `data/ml_models/`; also auto-downloaded on first run)
-
-| Role                     | Model                               | Library       |
-| ------------------------ | ----------------------------------- | ------------- |
-| Voice Activity Detection | silero-vad-int8 (~208 KB)           | `sherpa-onnx` |
-| Speech-to-Text           | NeMo streaming conformer 480ms int8 | `sherpa-onnx` |
-| Semantic Embeddings      | all-MiniLM-L6-v2 quint8 avx2        | `fastembed`   |
-
-Model file integrity is verified via xxh3_64 checksums in `models.py` on every `present` run. Do **not** modify those checksums unless model files are recalculated.
-
-### Settings Storage
-
-- `~/.moves/settings.toml`: LLM model name (plain TOML).
-- API key: **system keyring only** (`keyring` library → Windows Credential Manager). Never written to disk. `moves settings set key` always uses interactive hidden input; passing a value as CLI argument is blocked on purpose.
-
-## Code Style Guidelines
-
-### Imports
-
-- Group imports as stdlib, third-party, local.
-- Keep imports explicit (no wildcard imports).
-- Prefer top-level imports; use lazy imports only for heavy deps/startup/cycle concerns (pattern already used in `cli.py`).
-
-### Formatting
-
-- Use Ruff formatting as source of truth.
-- Split long calls/collections for readability.
-- Keep helper functions small and composable.
-
-### Typing
-
-- Annotate parameters and return values.
-- Prefer built-in generics: `list[str]`, `dict[str, int]`, `tuple[int, ...]`.
-- Prefer modern unions: `str | None`.
-- Existing code still has some `typing.Optional`; do not add new `Optional` unless staying local to untouched legacy code.
-
-### Naming
-
-- `snake_case`: functions/variables/modules.
-- `PascalCase`: classes.
-- `UPPER_SNAKE_CASE`: constants.
-- Prefix private helpers with `_`.
-
-### Data Models
-
-- Dataclasses are primary model style (`models.py`).
-- Use `frozen=True` when immutability is required.
-- Use `StrEnum` for string enums.
-
-### Paths and IO
-
-- Use `pathlib.Path` for filesystem paths.
-- Route app file operations through `DataHandler` when practical.
-- Use UTF-8 explicitly for text reads/writes.
-
-### Error Handling
-
-- Raise specific exceptions with actionable messages.
-- Preserve original exceptions with `raise ... from e` when wrapping.
-- In CLI handlers, display user-facing errors and exit with `typer.Exit(1)`.
-- Re-raise `typer.Exit`; handle `typer.Abort` deliberately.
-
-### Output and UX
-
-- Prefer `typer.echo(output(...))` for user-visible messages.
-- Keep error messages concise and include the next step when possible.
-- Use `err=True` for error-path output.
-
-### Async / Concurrency
-
-- Prefer `asyncio` for orchestration.
-- Use `asyncio.to_thread` for blocking operations.
-- Keep signal/cancellation behavior consistent with existing `SpeakerManager.process` flow.
-
-## Testing Guidance for New Work
-
-- Add tests under `tests/` with `test_*.py` naming.
-- Mirror source layout where helpful.
-- Prioritize tests around speaker resolution, data handling edge cases, and similarity scoring.
-- For bug fixes, add a regression test before or with the code change.
-
-## Domain-Specific Cautions
-
-- Do not edit model checksum constants in `src/moves_cli/models.py` unless model files actually changed and hashes were recalculated.
-- Preserve `speaker.yaml` compatibility when changing `Speaker` dataclass fields.
-- Keep offline/manual (`--manual`) workflows intact when changing preparation logic.
-- `moves settings set key` must **never** accept a plain CLI argument value — the interactive `getpass` prompt is intentional for security.
-- `calculate_hash.py` is a development utility (not a CLI subcommand of `moves`); do not wire it into the main app.
-- `NormalizationMode.LIVE` skips `num2words` for speed during live STT processing; `PREPROCESS` uses full normalization during preparation. Keep this distinction.
-
-## Cursor/Copilot Rules Check
-
-Searched for:
-
-- `.cursor/rules/`
-- `.cursorrules`
-- `.github/copilot-instructions.md`
-
-None are present in this repository right now.
-If added later, merge their directives into this file and treat them as authoritative.
-
-## Recommended Agent Workflow
-
-1. Read `pyproject.toml`, `README.md`, and relevant `docs/*.md` first.
-2. Make focused changes in `src/moves_cli/*`.
-3. Run lint/format on changed code.
-4. Run the narrowest test target possible (single test when available).
-5. If coverage is missing for changed behavior, add tests.
-6. Run a quick CLI smoke check for touched command paths.
+1. Read `pyproject.toml`, `README.md`, and the touched source files.
+2. Implement the smallest safe change.
+3. Update docs if user-facing behavior changed.
+4. Run lint + relevant smoke commands.
+5. Report exactly what changed, where, and what was verified.

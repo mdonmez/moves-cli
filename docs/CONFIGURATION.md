@@ -15,10 +15,12 @@ Detailed documentation for configuring `moves`, including LLM providers, API key
 
 ### What You Need to Configure
 
-Two main settings control `moves` behavior:
+Four main settings control `moves` behavior:
 
 1. **LLM Model** – Which AI model to use for section generation
-2. **API Key** – Authentication for your chosen LLM provider
+2. **LLM API Format** – Which generation API to use (`chat`, `responses`, or `auto`)
+3. **LLM Base URL** – Optional custom endpoint override
+4. **API Key** – Authentication for your chosen LLM provider
 
 ### Quick Setup (Google Gemini - Recommended)
 
@@ -28,6 +30,9 @@ Google Gemini is free and doesn't require a credit card:
 # 1. Get free API key from https://aistudio.google.com/app/apikey
 # 2. Configure in moves
 moves settings set model gemini/gemini-2.5-flash-lite
+moves settings set format chat
+# optional endpoint override
+# moves settings set base_url https://your-openai-compatible-endpoint/v1
 moves settings set key
 # 3. Paste API key when prompted (text hidden)
 ```
@@ -137,6 +142,51 @@ See [LiteLLM Docs](https://docs.litellm.ai/docs/providers) for full list.
 
 ---
 
+## LLM API Format
+
+`moves` supports two API styles for section generation:
+
+- `chat` – Uses Chat Completions flow (default, best compatibility)
+- `responses` – Uses Responses API flow
+- `auto` – Tries `responses` first, falls back to `chat` on failure
+
+Configure with:
+
+```powershell
+moves settings set format chat
+# or
+moves settings set format responses
+# or
+moves settings set format auto
+```
+
+Recommended defaults:
+- **Most users**: `chat`
+- **OpenAI-first workflows**: `responses`
+- **Mixed providers / uncertain compatibility**: `auto`
+
+---
+
+## LLM Base URL (Optional)
+
+You can configure an optional custom base URL:
+
+```powershell
+moves settings set base_url https://your-openai-compatible-endpoint/v1
+```
+
+Behavior:
+- If `base_url` is empty, `moves` does not pass it and lets LiteLLM use its normal defaults.
+- If `base_url` is set, `moves` forwards it to LiteLLM.
+
+Clear/reset it:
+
+```powershell
+moves settings unset base_url
+```
+
+---
+
 ## API Keys & Security
 
 ### Storing API Keys Securely
@@ -217,7 +267,7 @@ All configuration is stored in: `C:\Users\<YourUsername>\.moves\`
 
 ```
 ~/.moves/
-├── settings.toml          # LLM model config (plain text)
+├── settings.toml          # LLM model + format + base_url config (plain text)
 ├── settings.key           # API key (in Credential Manager)
 ├── ml_models/             # ONNX models (downloaded automatically)
 │   ├── all-MiniLM-L6-v2_quint8_avx2/
@@ -234,6 +284,8 @@ Contains your LLM model choice. Example:
 
 ```toml
 model = "gemini/gemini-2.5-flash-lite"
+format = "chat"
+base_url = ""
 ```
 
 You can edit this directly if needed:
@@ -246,6 +298,8 @@ But use the CLI for safety:
 
 ```powershell
 moves settings set model gemini/gemini-2.5-flash-lite
+moves settings set format chat
+moves settings set base_url https://your-openai-compatible-endpoint/v1
 ```
 
 ### Credential Manager (API Key)
@@ -391,6 +445,32 @@ moves settings set model gemini/gemini-2.5-flash-lite
 # Not: moves settings set model Gemini 2.5 Flash
 ```
 
+### "Invalid format"
+
+**Cause**: Unsupported format value.
+
+**Solution**: Use one of:
+
+```powershell
+moves settings set format chat
+moves settings set format responses
+moves settings set format auto
+```
+
+### "Custom endpoint not used"
+
+**Causes**:
+1. `base_url` is not configured
+2. Endpoint is unavailable or provider rejects it
+
+**Solution**:
+
+```powershell
+moves settings set model custom_openai/your-model-name
+moves settings set base_url https://your-openai-compatible-endpoint/v1
+moves settings list
+```
+
 ### "LLM API key error during preparation"
 
 **Causes**:
@@ -435,6 +515,7 @@ dir $env:USERPROFILE\.moves\ml_models
 ```powershell
 # One-time setup
 moves settings set model gemini/gemini-2.5-flash-lite
+moves settings set format chat
 moves settings set key
 # Paste your free API key from: https://aistudio.google.com/app/apikey
 
@@ -449,6 +530,7 @@ moves present MyTalk
 ```powershell
 # One-time setup
 moves settings set model gpt-4o-mini
+moves settings set format chat
 moves settings set key
 # Paste your paid OpenAI API key
 
@@ -462,6 +544,7 @@ moves present MyTalk
 ```powershell
 # Use LLM for initial generation
 moves settings set model gemini/gemini-2.5-flash-lite
+moves settings set format auto
 moves settings set key
 moves speaker prepare MyTalk
 
@@ -485,6 +568,19 @@ notepad $env:USERPROFILE\.moves\speakers\a1b2c\sections.md
 
 # Present without any API keys
 moves present MyTalk
+```
+
+### Example 5: Custom Base URL Override
+
+```powershell
+# One-time setup
+moves settings set model custom_openai/your-model-name
+moves settings set format chat
+moves settings set base_url https://your-openai-compatible-endpoint/v1
+moves settings set key
+
+# Use as normal
+moves speaker prepare MyTalk
 ```
 
 ---

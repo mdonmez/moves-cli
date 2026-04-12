@@ -84,6 +84,8 @@ class SimilarityResult:
 @dataclass
 class Settings:
     model: str
+    format: str
+    base_url: str | None
     key: str
 
 

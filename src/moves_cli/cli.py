@@ -4,7 +4,13 @@ from typing import Optional
 
 import typer
 
-from moves_cli.config import DEFAULT_API_KEY, DEFAULT_LLM_MODEL, WINDOW_SIZE
+from moves_cli.config import (
+    DEFAULT_API_KEY,
+    DEFAULT_LLM_BASE_URL,
+    DEFAULT_LLM_FORMAT,
+    DEFAULT_LLM_MODEL,
+    WINDOW_SIZE,
+)
 from moves_cli.models import Section
 from moves_cli.utils.data_handler import DataHandler
 from moves_cli.utils.formatters import format_datetime, output
@@ -63,7 +69,9 @@ app = typer.Typer(
 
 # Subcommands for speaker and settings management
 speaker_app = typer.Typer(help="Manage speaker profiles, files, and processing")
-settings_app = typer.Typer(help="Configure system settings (model, API key)")
+settings_app = typer.Typer(
+    help="Configure system settings (model, format, base_url, API key)"
+)
 
 
 @speaker_app.command("add")
@@ -171,7 +179,9 @@ def speaker_edit(
         speaker_dir = speaker_manager.SPEAKERS_PATH / updated_speaker.speaker_id
         updates = {"Data directory": speaker_dir}
         if presentation_path:
-            updates["New presentation source"] = updated_speaker.presentation_source_display
+            updates["New presentation source"] = (
+                updated_speaker.presentation_source_display
+            )
         if transcript_path:
             updates["New transcript source"] = updated_speaker.transcript_source_display
         typer.echo(
@@ -300,6 +310,8 @@ def speaker_prepare(
         settings = settings_editor.list()
         llm_model = None
         llm_api_key = None
+        llm_format = DEFAULT_LLM_FORMAT
+        llm_base_url = None
 
         if not manual:
             # Validate LLM settings (auto mode only)
@@ -333,8 +345,20 @@ def speaker_prepare(
                 )
                 raise typer.Exit(1)
 
+            valid_formats = {"chat", "responses", "auto"}
+            if settings.format not in valid_formats:
+                typer.echo(
+                    output(
+                        f"Error: Invalid LLM format '{settings.format}'. Valid formats: chat, responses, auto."
+                    ),
+                    err=True,
+                )
+                raise typer.Exit(1)
+
             llm_model = settings.model
             llm_api_key = settings.key
+            llm_format = settings.format
+            llm_base_url = settings.base_url
 
         # Resolve speakers
         if all:
@@ -365,6 +389,8 @@ def speaker_prepare(
                 resolved_speakers,
                 llm_model=llm_model,
                 llm_api_key=llm_api_key,
+                llm_format=llm_format,
+                llm_base_url=llm_base_url,
                 skip_confirmation=yes,
                 manual_mode=manual,
             )
@@ -688,7 +714,7 @@ def present(
         _safe_echo(
             output(
                 f"Presentation started for {resolved_speaker.label}.",
-                "[←/→] Previous/Next | [Ins] Pause/Resume | [Ctrl+C] Exit",
+                "[M] Pause/Resume | [←/→] Previous/Next | [Q] Exit",
             )
         )
 
@@ -707,7 +733,7 @@ def present(
 def settings_list(
     show: bool = typer.Option(False, "--show", "-s", help="Reveal full API key"),
 ):
-    """Display current system configuration (model, API key status)"""
+    """Display current system configuration (model, format, API key status)"""
     try:
         # Create settings editor instance
         settings_editor = settings_editor_instance()
@@ -715,6 +741,8 @@ def settings_list(
 
         # Display settings
         model_value = settings.model if settings.model else "Not configured"
+        format_value = settings.format if settings.format else DEFAULT_LLM_FORMAT
+        base_url_value = settings.base_url if settings.base_url else "Not configured"
 
         if settings.key:
             display_key = settings.key
@@ -733,6 +761,8 @@ def settings_list(
                 {
                     "Configuration file": settings_file,
                     "model (LLM Model)": model_value,
+                    "format (LLM API Format)": format_value,
+                    "base_url (LLM Base URL)": base_url_value,
                     "key (API Key)": display_key,
                     "Note": "API keys are stored in Windows Credential Manager (keyring)",
                 },
@@ -748,16 +778,20 @@ def settings_list(
 
 @settings_app.command("set")
 def settings_set(
-    key: str = typer.Argument(..., help="Setting name to update: 'model' or 'key'"),
-    value: str | None = typer.Argument(None, help="Setting value (only for 'model')"),
+    key: str = typer.Argument(
+        ..., help="Setting name to update: 'model', 'format', 'base_url', or 'key'"
+    ),
+    value: str | None = typer.Argument(
+        None, help="Setting value (required for 'model', 'format', and 'base_url')"
+    ),
 ):
-    """Configure system settings: model (LLM model name) or key (API key)"""
+    """Configure system settings: model, format, base_url, or key"""
     try:
         # Create settings editor instance
         settings_editor = settings_editor_instance()
 
         # Valid setting keys
-        valid_keys = ["model", "key"]
+        valid_keys = ["model", "format", "base_url", "key"]
 
         if key not in valid_keys:
             typer.echo(output(f"Error: Invalid setting key '{key}'"), err=True)
@@ -791,14 +825,42 @@ def settings_set(
                 raise typer.Exit(1)
             value = value.strip()
 
-        # Check if value is provided for model setting
-        if key == "model" and value is None:
+        # Check if value is provided for model/format/base_url setting
+        if key in {"model", "format", "base_url"} and value is None:
             typer.echo(
-                output("Error: value argument is required for 'model' setting"),
+                output(f"Error: value argument is required for '{key}' setting"),
                 err=True,
             )
-            typer.echo(output("Usage: moves settings set model <model-name>"), err=True)
+            if key == "model":
+                typer.echo(
+                    output("Usage: moves settings set model <model-name>"), err=True
+                )
+            elif key == "format":
+                typer.echo(
+                    output("Usage: moves settings set format <chat|responses|auto>"),
+                    err=True,
+                )
+            else:
+                typer.echo(
+                    output("Usage: moves settings set base_url <url>"),
+                    err=True,
+                )
             raise typer.Exit(1)
+
+        if key == "format" and value is not None:
+            value = value.strip().lower()
+            valid_formats = {"chat", "responses", "auto"}
+            if value not in valid_formats:
+                typer.echo(
+                    output(
+                        f"Error: Invalid format '{value}'. Valid formats: chat, responses, auto."
+                    ),
+                    err=True,
+                )
+                raise typer.Exit(1)
+
+        if key == "base_url" and value is not None:
+            value = value.strip()
 
         # Update setting
         success = settings_editor.set(key, value)
@@ -836,7 +898,15 @@ def settings_set(
 
 @settings_app.command(
     "unset",
-    help=f"Reset a setting to its default value (model: {DEFAULT_LLM_MODEL}, key: {DEFAULT_API_KEY})",
+    help=(
+        "Reset a setting to its default value "
+        "("
+        f"model: {DEFAULT_LLM_MODEL}, "
+        f"format: {DEFAULT_LLM_FORMAT}, "
+        f"base_url: {DEFAULT_LLM_BASE_URL}, "
+        f"key: {DEFAULT_API_KEY}"
+        ")"
+    ),
 )
 def settings_unset(
     key: str = typer.Argument(..., help="Setting name to reset"),
@@ -846,7 +916,7 @@ def settings_unset(
         settings_editor = settings_editor_instance()
 
         # Check if key exists in template
-        valid_keys = ["model", "key"]
+        valid_keys = ["model", "format", "base_url", "key"]
         if key not in valid_keys:
             typer.echo(output(f"Error: Invalid setting key '{key}'"), err=True)
             typer.echo(output(f"Valid keys: {', '.join(valid_keys)}"), err=True)
