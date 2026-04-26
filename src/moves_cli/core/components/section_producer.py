@@ -436,6 +436,8 @@ class SectionProducer:
                 messages=messages,
                 response_model=sections_output_model,
                 temperature=temperature,
+                reasoning_effort="none",  # we don't need complex reasoning, we just want the sections extracted reliably, so we can set it to none for faster responses
+                drop_params=True,  # drop unsupported params instead of raising exceptions
                 **connection_kwargs,
             )
             result = [item.content for item in response.sections]
@@ -480,6 +482,10 @@ class SectionProducer:
                     }
                 },
                 temperature=temperature,
+                reasoning={
+                    "effort": "none"
+                },  # we don't need complex reasoning, we just want the sections extracted reliably, so we can set it to none for faster responses
+                drop_params=True,  # drop unsupported params instead of raising exceptions
                 **connection_kwargs,
             )
 
